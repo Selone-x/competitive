@@ -6,7 +6,6 @@ void solve() {
     int n;
     cin >> n;
     cout << "Hello, World!" << '\n';
-    
 }
 
 int main() {
