@@ -1,10 +1,34 @@
-# Python-generated files
+# Compiled files
+*.exe
+*.out
+*.o
+*.pyc
 __pycache__/
-*.py[oc]
+*.so
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log
+
+# Personal notes (не коммитим личные разборы задач)
+editorials/*
+!editorials/examples/
+
+# Текущая задача (личный файл)
+# competitive_task.md
+
+# Build artifacts
 build/
 dist/
-wheels/
-*.egg-info
-
-# Virtual environments
-.venv
+*.egg-info/
