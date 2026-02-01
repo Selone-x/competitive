@@ -1,0 +1,32 @@
+# По умолчанию - вывод списка команд
+default:
+    @just --list
+
+# Компиляция проекта
+build:
+    @g++ -std=c++20 -O2 -Wall -Wextra task.cpp -o task
+    @echo "Сборка завершена!"
+
+# Запуск программы
+run:
+    @./task
+
+# Компиляция с запуском
+br: build run
+
+# Очистка скомпилированных файлов
+clean:
+    @rm -f task
+    @echo "Очистка завершена"
+
+# Пересборка (очистка + сборка)
+rebuild: clean build
+
+# Компиляция в Debug режиме
+debug-build:
+    @g++ -std=c++20 -g -Wall -Wextra -DDEBUG task.cpp -o task
+    @echo "Debug сборка завершена!"
+
+# Запуск с отладчиком gdb
+debug: debug-build
+    @gdb ./task
