@@ -378,10 +378,23 @@ fi
 Если "да" → запустить встроенную логику `/topic_analysis` (см. раздел "Встроенные команды" ниже)
 
 #### 1.3. Изучение материалов
-```
-Отлично! Давай изучим тему "{topic}".
 
-Сначала прочитай overview:
+Перед показом материалов: проверить есть ли предыдущие сессии по этой теме с weak_subtopics:
+```python
+# Найти последнюю сессию по этой теме
+prev_weak = []
+for session in reversed(profile.session_history):
+    if session["mode"] == "learning" and session["topic"] == topic:
+        prev_weak = session.get("weak_subtopics", [])
+        break
+```
+
+Если `prev_weak` не пустой:
+```
+Я помню, что в прошлый раз ты не до конца разобрался с:
+⚠ {prev_weak[0]}, {prev_weak[1]}, ...
+
+Давай начнем с этого!
 ```
 
 Показать содержимое `editorials/{topic}/index.md`
@@ -389,7 +402,15 @@ fi
 ```
 Прочитал? Вот ключевые концепции, которые важно понять:
 
-{извлечь из index.md секцию "Key Concepts" или первые 3 заметки}
+{если prev_weak не пустой:
+    "Акцент на прошлый раз:"
+    для каждого subtopic из prev_weak → объяснить подробнее
+    "Остальные:"
+    показать остальные концепции кратко
+}
+{иначе:
+    извлечь из index.md секцию "Key Concepts" или первые 3 заметки
+}
 
 Если что-то непонятно - спрашивай! Могу объяснить подробнее любую часть.
 
@@ -411,17 +432,37 @@ fi
 
 **Генерация вопросов** (динамически на основе материалов):
 
-1. **Концептуальный вопрос**: "Что такое {ключевая концепция}?"
-2. **Применение**: "В каких задачах применяется {техника}?"
-3. **Код**: Показать код из библиотеки, спросить про сложность или назначение
-4. **Pattern recognition**: Описать задачу, спросить какой подход применить
-5. **Граничные случаи**: "Какие edge cases нужно учесть?"
+Стандартный набор вопросов:
+1. **Концептуальный вопрос** (subtopic: definition): "Что такое {ключевая концепция}?"
+2. **Применение** (subtopic: use_cases): "В каких задачах применяется {техника}?"
+3. **Код** (subtopic: implementation): Показать код из библиотеки, спросить про сложность или назначение
+4. **Pattern recognition** (subtopic: pattern_matching): Описать задачу, спросить какой подход применить
+5. **Граничные случаи** (subtopic: edge_cases): "Какие edge cases нужно учесть?"
+
+**Приоритизация по prev_weak:**
+Если есть `prev_weak` из предыдущей сессии — вопросы на эти subtopics ставятся **первыми** в порядке quiz. Например если prev_weak = ["edge_cases", "implementation"], то порядок: edge_cases → implementation → остальные.
+
+Инициализировать перед quiz:
+```python
+weak_subtopics = []
+strong_subtopics = []
+
+# Маппинг типа вопроса → subtopic
+question_subtopic_map = {
+    "Conceptual": "definition",
+    "Application": "use_cases",
+    "Code": "implementation",
+    "Pattern recognition": "pattern_matching",
+    "Edge cases": "edge_cases"
+}
+```
 
 Для каждого вопроса:
+- Определить subtopic по типу вопроса из маппинга выше
 - Ждать ответ пользователя
 - Оценить правильность (не требовать точного совпадения, оценивать понимание)
-- Если неправильно → дать наводящий вопрос
-- Если правильно → подтвердить и пояснить нюансы
+- Если правильно → подтвердить и пояснить нюансы → добавить subtopic в strong_subtopics
+- Если неправильно → дать наводящий вопрос → добавить subtopic в weak_subtopics
 
 После quiz:
 ```
@@ -494,7 +535,9 @@ session_record = {
     "confidence_before": old_confidence,
     "confidence_after": new_confidence,
     "duration_minutes": elapsed_time,
-    "materials_created": not has_materials  # True если создавали
+    "materials_created": not has_materials,  # True если создавали
+    "weak_subtopics": weak_subtopics,        # Что не понял в этой теме
+    "strong_subtopics": strong_subtopics     # Что усвоил уверенно
 }
 
 profile.session_history.append(session_record)
@@ -512,6 +555,13 @@ save_profile(profile)
 Тема: {topic}
 Quiz: {correct}/{total}
 Confidence: {old_confidence} → {new_confidence}
+
+{if strong_subtopics:
+    "✅ Усвоено: " + ", ".join(strong_subtopics)
+}
+{if weak_subtopics:
+    "⚠ Стоит повторить: " + ", ".join(weak_subtopics)
+}
 
 {if new_confidence >= 8:
     "🎉 Тема освоена! Можно переходить к следующей."
