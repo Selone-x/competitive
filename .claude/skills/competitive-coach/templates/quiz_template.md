@@ -1,42 +1,42 @@
-# Quiz Template: {Topic Name}
+# Шаблон Quiz: {Название темы}
 
-## Question 1: Conceptual
-**Question**: {Conceptual question about the topic}
-**Expected Answer**: {Key points that should be mentioned}
-**Common Mistakes**: {Typical misconceptions or errors}
-**Follow-up if wrong**: {Guiding question to lead them to the answer}
+## Вопрос 1: Концептуальный
+**Вопрос:** {Концептуальный вопрос о теме}
+**Ожидаемый ответ:** {Ключевые моменты которые должны быть упомянуты}
+**Частые ошибки:** {Типичные заблуждения или погрешности}
+**Наводящий вопрос если ошибся:** {Вопрос-подсказка для выхода на правильный ответ}
 
-## Question 2: Application
-**Question**: {When/where would you use this technique?}
-**Expected Answer**: {Real-world scenarios and problem patterns}
-**Common Mistakes**: {Overuse or misapplication}
-**Follow-up if wrong**: {Example scenario to clarify}
+## Вопрос 2: Применение
+**Вопрос:** {Когда и где применяется эта техника?}
+**Ожидаемый ответ:** {Реальные сценарии и паттерны задач}
+**Частые ошибки:** {Избыточное или неправильное применение}
+**Наводящий вопрос если ошибся:** {Пример сценария для пояснения}
 
-## Question 3: Code Analysis
-**Question**: {Show code snippet - what's the complexity/bug/pattern?}
+## Вопрос 3: Анализ кода
+**Вопрос:** {Покажу кусок кода — какова сложность / баг / паттерн?}
 ```cpp
-{code snippet}
+{кусок кода}
 ```
-**Expected Answer**: {What they should identify}
-**Common Mistakes**: {Common misanalyses}
-**Follow-up if wrong**: {Hint about what to look at}
+**Ожидаемый ответ:** {Что должен опознать}
+**Частые ошибки:** {Распространённые ошибки анализа}
+**Наводящий вопрос если ошибся:** {Подсказка на что обратить внимание}
 
-## Question 4: Pattern Recognition
-**Question**: {Given this problem description, what approach would you use?}
-**Expected Answer**: {Key observation that leads to the technique}
-**Common Mistakes**: {Missing the key insight}
-**Follow-up if wrong**: {Hint about what property to notice}
+## Вопрос 4: Распознавание паттерна
+**Вопрос:** {Дана задача с таким описанием — какой подход применить?}
+**Ожидаемый ответ:** {Ключевое наблюдение ведущее к технике}
+**Частые ошибки:** {Пропуск ключевого инсайта}
+**Наводящий вопрос если ошибся:** {Подсказка на какое свойство заметить}
 
-## Question 5: Edge Cases
-**Question**: {What edge cases should be handled when using this technique?}
-**Expected Answer**: {Common edge cases and pitfalls}
-**Common Mistakes**: {Overlooking certain cases}
-**Follow-up if wrong**: {Example that breaks naive implementation}
+## Вопрос 5: Граничные случаи
+**Вопрос:** {Какие edge cases надо учитывать при использовании этой техники?}
+**Ожидаемый ответ:** {Типичные edge cases и подводные камни}
+**Частые ошибки:** {Что обычно упускают}
+**Наводящий вопрос если ошибся:** {Пример ломающий наивную реализацию}
 
 ---
 
-## Scoring Guide
-- 5/5: Excellent understanding, ready for practice
-- 3-4/5: Good grasp, may need light review
-- 1-2/5: Need more study, review materials first
-- 0/5: Start from basics
+## Шкала оценок
+- 5/5: Отличное понимание, готов к практике
+- 3–4/5: Хорошее понимание, возможно нужен лёгкий повтор
+- 1–2/5: Нужна дополнительная работа, повторить материалы
+- 0/5: Начать с основ

@@ -1,0 +1,37 @@
+{
+  "version": "2.0",
+  "initialized_at": "",
+  "user_info": {
+    "codeforces_handle": "",
+    "preferred_language": "cpp",
+    "worked_with_claude": false
+  },
+  "knowledge_assessment": {
+    "strong_topics": [],
+    "weak_topics": [],
+    "topic_confidence": {
+      "binary_search": 5,
+      "two_pointers": 5,
+      "sorting": 5,
+      "dynamic_programming": 5,
+      "graphs_dfs_bfs": 5,
+      "greedy": 5,
+      "number_theory": 5,
+      "data_structures": 5,
+      "strings": 5,
+      "geometry": 5
+    }
+  },
+  "training_plan": {
+    "current_phase": "fundamentals",
+    "target_rating": 1600,
+    "focus_areas": [],
+    "weekly_goals": {
+      "problems_per_week": 10,
+      "learning_sessions_per_week": 2
+    },
+    "strategy": "balanced"
+  },
+  "recent_summary": [],
+  "last_updated": ""
+}

@@ -1,21 +1,21 @@
-# Quiz: Binary Search
+# Quiz: Binary Search (Бинарный поиск)
 
-## Question 1: Conceptual
-**Question**: What is the key requirement for using binary search, and why is it necessary?
-**Expected Answer**: The array/search space must be monotonic (sorted or have some monotonic property). This is necessary because binary search relies on eliminating half of the search space based on comparisons - if elements aren't ordered, we can't guarantee which half to discard.
-**Common Mistakes**: Only mentioning "sorted" without explaining why, or forgetting that monotonicity (not just sorting) is the real requirement.
-**Follow-up if wrong**: If you have an unsorted array [5, 1, 9, 3], why can't you binary search for 9?
+## Вопрос 1: Концептуальный
+**Вопрос:** Какое ключевое условие необходимо для применения бинарного поиска и почему оно важно?
+**Ожидаемый ответ:** Массив / пространство поиска должны быть монотонными (отсортированными или обладающими монотонным свойством). Это необходимо потому что бинарный поиск работает за счёт отбрасывания половины пространства поиска при каждом сравнении — если элементы не упорядочены, нельзя гарантировать какую половину отбрасывать.
+**Частые ошибки:** Говорить только про "отсортированный массив" не объясняя почему, или забыть что реальное условие — монотонность, а не просто сортировка.
+**Наводящий вопрос если ошибся:** Если массив не отсортирован [5, 1, 9, 3], почему нельзя бинарно искать 9?
 
-## Question 2: Application
-**Question**: When would you use binary search on answer vs binary search on array?
-**Expected Answer**:
-- Binary search on array: When you have a sorted array and need to find a specific element
-- Binary search on answer: When you need to find an optimal value and can verify if a candidate answer is valid (e.g., "minimum time to complete tasks", "maximum minimum distance")
-**Common Mistakes**: Not recognizing binary search on answer opportunities, thinking binary search only works on arrays.
-**Follow-up if wrong**: If a problem asks "what's the minimum number of days to ship all packages given capacity limits", what are you searching for?
+## Вопрос 2: Применение
+**Вопрос:** Когда применять бинарный поиск по массиву vs бинарный поиск по ответу?
+**Ожидаемый ответ:**
+- Бинарный поиск по массиву: есть отсортированный массив и нужно найти конкретный элемент
+- Бинарный поиск по ответу: нужно найти оптимальное значение и можно проверить валидность кандидата (например "минимальное время завершения задач", "максимальный минимум расстояния")
+**Частые ошибки:** Не замечать возможности бинарного поиска по ответу, думать что бинарный поиск работает только по массивам.
+**Наводящий вопрос если ошибся:** Если задача спрашивает "какая минимальная грузоподъёмность чтобы отправить все посылки за N дней", что именно ты ищешь?
 
-## Question 3: Code Analysis
-**Question**: What's wrong with this binary search implementation?
+## Вопрос 3: Анализ кода
+**Вопрос:** Что не так с этой реализацией бинарного поиска?
 ```cpp
 int binary_search(vector<int>& arr, int target) {
     int left = 0, right = arr.size();
@@ -28,31 +28,31 @@ int binary_search(vector<int>& arr, int target) {
     return -1;
 }
 ```
-**Expected Answer**: Infinite loop issue - when `arr[mid] < target`, should be `left = mid + 1` not `left = mid`. Otherwise when `right - left == 1`, left will never advance.
-**Common Mistakes**: Not recognizing the infinite loop, or suggesting to change the while condition instead of fixing the update.
-**Follow-up if wrong**: Trace through with arr=[1,2,3,4], target=4. What happens when left=3, right=4?
+**Ожидаемый ответ:** Бесконечный цикл — когда `arr[mid] < target`, должно быть `left = mid + 1`, а не `left = mid`. Иначе когда `right - left == 1`, left никогда не продвинется.
+**Частые ошибки:** Не замечать бесконечный цикл, или предлагать менять условие while вместо исправления обновления.
+**Наводящий вопрос если ошибся:** Прогони по arr=[1,2,3,4], target=4. Что случится при left=3, right=4?
 
-## Question 4: Pattern Recognition
-**Question**: You need to split an array into K subarrays such that the maximum sum among subarrays is minimized. What technique applies here?
-**Expected Answer**: Binary search on answer. The answer (maximum sum) has a valid range (max element to sum of all elements). For any candidate max sum, we can verify if it's achievable by greedily forming subarrays - if we can form ≤K subarrays, it's valid.
-**Common Mistakes**: Trying dynamic programming or greedy without recognizing the monotonic property of valid answers.
-**Follow-up if wrong**: If max sum = X works (can split into K subarrays), will max sum = X+1 also work? What does this tell you?
+## Вопрос 4: Распознавание паттерна
+**Вопрос:** Нужно разбить массив на K подмассивов так, чтобы максимальная сумма среди подмассивов была минимальной. Какая техника подходит?
+**Ожидаемый ответ:** Бинарный поиск по ответу. Ответ (максимальная сумма) имеет допустимый диапазон (max элемент до суммы всех элементов). Для любого кандидата на максимальную сумму можно проверить достижимость жадным разбиением — если можно разбить на ≤K подмассивов, значит кандидат валиден.
+**Частые ошибки:** Пытаться использовать DP или greedy не замечая монотонное свойство валидных ответов.
+**Наводящий вопрос если ошибся:** Если максимальная сумма = X работает (можно разбить на K подмассивов), будет ли работать максимальная сумма = X+1? Что это говорит?
 
-## Question 5: Edge Cases
-**Question**: What edge cases should you handle when implementing binary search?
-**Expected Answer**:
-- Empty array
-- Single element array
-- Target not found
-- Duplicate elements (depending on requirements - first/last occurrence)
-- Integer overflow in mid calculation: use `left + (right - left) / 2` instead of `(left + right) / 2`
-**Common Mistakes**: Forgetting overflow, not considering what to return when target not found, assuming array always has the target.
-**Follow-up if wrong**: What happens if left=2^30 and right=2^30, and you calculate mid = (left + right) / 2 in 32-bit integer?
+## Вопрос 5: Граничные случаи
+**Вопрос:** Какие edge cases стоит обрабатывать при реализации бинарного поиска?
+**Ожидаемый ответ:**
+- Пустой массив
+- Массив из одного элемента
+- Элемент не найден
+- Дубликаты (если нужна первая/последняя позиция)
+- Переполнение при вычислении mid: использовать `left + (right - left) / 2` вместо `(left + right) / 2`
+**Частые ошибки:** Забыть про переполнение, не подумать что вернуть если элемент не найден, предполагать что элемент всегда есть.
+**Наводящий вопрос если ошибся:** Что случится если left=2^30 и right=2^30 и ты считаешь mid = (left + right) / 2 в 32-битном целом?
 
 ---
 
-## Scoring Guide
-- 5/5: Excellent understanding, ready for practice
-- 3-4/5: Good grasp, may need light review
-- 1-2/5: Need more study, review materials first
-- 0/5: Start from basics
+## Шкала оценок
+- 5/5: Отличное понимание, готов к практике
+- 3–4/5: Хорошее понимание, возможно нужен лёгкий повтор
+- 1–2/5: Нужна дополнительная работа, повторить материалы
+- 0/5: Начать с основ

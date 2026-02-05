@@ -1,92 +1,92 @@
-# Training Plan for {handle}
+# План тренировок для {handle}
 
-**Generated**: {date}
-**Current Rating**: {rating}
-**Target Rating**: {target}
-**Current Phase**: {phase}
+**Создан:** {date}
+**Текущий рейтинг:** {rating}
+**Целевой рейтинг:** {target}
+**Текущая фаза:** {phase}
 
 ---
 
-## Priority Focus Areas
+## Приоритетные темы
 
-### High Priority (Weak Topics)
+### Высокий приоритет (слабые темы)
 {weak_topics_list}
 
-### Medium Priority (Growth Areas)
+### Средний приоритет (темы для роста)
 {medium_topics_list}
 
-### Low Priority (Strong Topics - Maintain)
+### Низкий приоритет (сильные темы — поддержка)
 {strong_topics_list}
 
 ---
 
-## Weekly Schedule
+## Расписание на неделю
 
-| Day | Activity | Topic | Details |
-|-----|----------|-------|---------|
-| Mon | Practice | {topic1} | 2 problems (rating ±100) |
-| Tue | Practice | {topic2} | 2 problems (rating ±100) |
-| Wed | Learning | {weak_topic1} | Study + Quiz + 1 easy problem |
-| Thu | Practice | {topic3} | 2 problems (rating ±100) |
-| Fri | Practice | Mixed | 2 problems (any weak topic) |
-| Sat | Learning | {weak_topic2} | Study + Quiz + 1 easy problem |
-| Sun | Review | Any | Revisit failed problems or rest |
-
----
-
-## Goals
-
-### Short-term (1-2 weeks)
-- Complete 10-15 problems
-- Improve confidence in {weak_topic1} from {score1} to {score1+2}
-- Study and complete quiz for {weak_topic1} and {weak_topic2}
-
-### Medium-term (1-2 months)
-- Solve 50+ problems
-- Bring all weak topics to confidence ≥6
-- Reach rating {intermediate_target}
-
-### Long-term (3-6 months)
-- Solve 200+ problems
-- Achieve target rating {target}
-- Build strong foundation in all fundamental topics
-- Develop problem-solving intuition for {phase} level
+| День | Занятие | Тема | Подробности |
+|------|---------|------|-------------|
+| Пн | Практика | {topic1} | 2 задачи (рейтинг ±100) |
+| Вт | Практика | {topic2} | 2 задачи (рейтинг ±100) |
+| Ср | Обучение | {weak_topic1} | Изучение + Quiz + 1 лёгкая задача |
+| Чт | Практика | {topic3} | 2 задачи (рейтинг ±100) |
+| Пт | Практика | Смешанно | 2 задачи (любая слабая тема) |
+| Сб | Обучение | {weak_topic2} | Изучение + Quiz + 1 лёгкая задача |
+| Вс | Повтор | Любая | Вернуться к нерешённым или отдых |
 
 ---
 
-## Strategy: {strategy}
+## Цели
 
-**Balanced**: Mix of weak and strong topics, gradual improvement
-**Focused**: Heavy emphasis on weakest topics first
-**Challenge**: Push above comfort zone with harder problems
+### Краткосрочные (1–2 недели)
+- Решить 10–15 задач
+- Улучшить confidence по {weak_topic1} с {score1} до {score1+2}
+- Изучить и пройти quiz по {weak_topic1} и {weak_topic2}
 
----
+### Среднесрочные (1–2 месяца)
+- Решить 50+ задач
+- Довести все слабые темы до confidence ≥ 6
+- Достичь рейтинга {intermediate_target}
 
-## Progress Metrics
-
-Track weekly:
-- Problems solved: {current}/{weekly_goal}
-- Learning sessions: {current}/{weekly_learning_goal}
-- Average solve time: {avg_time} minutes
-- Success rate: {success_rate}%
-
-Track monthly:
-- Rating change: {rating_change}
-- Topics confidence improvement: {confidence_changes}
-- Total problems solved: {total_solved}
+### Долгосрочные (3–6 месяцев)
+- Решить 200+ задач
+- Достичь целевого рейтинга {target}
+- Выстроить крепкую базу по всем базовым темам
+- Развить интуицию решения задач уровня {phase}
 
 ---
 
-## Adjustment Triggers
+## Стратегия: {strategy}
 
-Plan will be automatically adjusted when:
-- Confidence in a topic reaches 8+ → reduce focus, move to maintenance
-- Confidence drops below 4 → increase focus, add learning sessions
-- Rating changes by ±200 → recalculate problem difficulty recommendations
-- 4 weeks with no progress → reassess strategy
+**Сбалансированная:** Смешивание слабых и сильных тем, постепенный рост
+**Фокус на слабых:** Упор на самые слабые темы сначала
+**Челлендж:** Задачи выше зоны комфорта
 
 ---
 
-## Notes
+## Метрики прогресса
+
+Отслеживать каждую неделю:
+- Решено задач: {current}/{weekly_goal}
+- Обучающих сессий: {current}/{weekly_learning_goal}
+- Среднее время решения: {avg_time} минут
+- Процент успеха: {success_rate}%
+
+Отслеживать каждый месяц:
+- Изменение рейтинга: {rating_change}
+- Рост confidence по темам: {confidence_changes}
+- Всего решено задач: {total_solved}
+
+---
+
+## Триггеры корректировки
+
+План будет автоматически скорректирован при:
+- Confidence по теме достигает 8+ → снижаем приоритет, переводим на поддержку
+- Confidence падает ниже 4 → увеличиваем приоритет, добавляем обучающие сессии
+- Рейтинг меняется на ±200 → пересчитываем рекомендуемую сложность задач
+- 4 недели без прогресса → переоцениваем стратегию
+
+---
+
+## Заметки
 
 {custom_notes}

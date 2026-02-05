@@ -35,4 +35,7 @@ dist/
 
 # Coach personal data
 coach/profile*.json
+coach/core*.json
+coach/stats*.json
 coach/sessions/
+coach/archive/

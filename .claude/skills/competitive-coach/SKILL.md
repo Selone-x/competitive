@@ -30,23 +30,23 @@ description: >
 
 1. **Проверить существование профиля:**
 ```bash
-if [ ! -f coach/profile.json ]; then
+if [ ! -f coach/core.json ]; then
     # Профиля нет - запустить инициализацию
     echo "Профиль не найден. Давай создадим его!"
     # Переход к процессу инициализации (см. ниже)
 else
-    # Профиль есть - загрузить и продолжить
-    profile=$(cat coach/profile.json)
+    # Профиль есть - загрузить core и продолжить
+    profile=$(cat coach/core.json)
     # Переход к основному меню или обработке аргумента
 fi
 ```
 
 2. **Обработка аргументов:**
 - Если аргумент `init` → запустить инициализацию (даже если профиль есть)
-- Если аргумент `stats` → показать статистику
-- Если аргумент `sync` → синхронизировать с CF
-- Если аргумент `plan` → показать план
-- Если аргумент `reset {topic}` → сбросить тему
+- Если аргумент `stats` → загрузить core.json + stats.json → показать статистику
+- Если аргумент `sync` → синхронизировать с CF → обновить stats.json
+- Если аргумент `plan` → показать план из core.json
+- Если аргумент `reset {topic}` → сбросить тему в core.json
 - Если нет аргумента и профиль есть → показать меню режимов
 
 ---
@@ -72,27 +72,39 @@ fi
 ```
 
 Если ответ "да": "Отлично! Тогда ты знаешь как я работаю. Продолжим."
-Если ответ "нет": "Понял! Я буду помогать через наводящие вопросы, не выдавая готовые решения."
+Если ответ "нет": "Понял! Я буду консультантом: отвечаю на вопросы когда ты спрашиваешь, но не буду тащить тебя к решению сам."
 
-#### Шаг 2: Проверка существующей библиотеки
-Выполнить:
+#### Шаг 2: Библиотека алгоритмов
+```
+У тебя есть свои шаблоны алгоритмов (набивашки) где-либо?
+Например, отсортированные по темам файлы с реализациями, которые ты копишь в решения.
+```
+
+Если "да":
+```
+Отлично! Скопируй их в library/:
+- C++ файлы → library/cpp/
+- Python файлы → library/py/
+
+Формат не критичен — я разберусь. Если хочешь, могу подсказать как оформить.
+Скопирую и проверю что всё на месте.
+```
+Ждать подтверждения от пользователя, затем:
 ```bash
 ls library/cpp 2>/dev/null | wc -l
 ls library/py 2>/dev/null | wc -l
 ```
-
-Если найдены файлы:
 ```
-Вижу у тебя уже есть библиотека кода!
+Проверил:
 - C++: {cpp_count} файлов
 - Python: {py_count} файлов
 
-Это отлично - я буду использовать её в обучении.
+Всё на месте, буду использовать в обучении.
 ```
 
-Если нет:
+Если "нет":
 ```
-Библиотека кода пока пустая. Ничего страшного - будем заполнять вместе!
+Ок, библиотека пустая. Ничего страшного — будем заполнять вместе по мере тренировок.
 ```
 
 #### Шаг 3: Интеграция с Codeforces
@@ -134,27 +146,83 @@ python3 .claude/skills/competitive-coach/scripts/codeforces_api.py {handle}
 Ок, работаем без статистики CF. Оценим знания вручную.
 ```
 
-#### Шаг 4: Самооценка знаний
+#### Шаг 4: Адаптивная оценка знаний
+
+Для каждой из 10 тем проводится адаптивный мини-quiz из 2–3 вопросов.
+Цель: быстро определить уровень 1–10 без длинных опросов.
+
+**Темы для оценки (по очереди):**
+1. **Binary Search** — бинарный поиск, поиск по ответу
+2. **Two Pointers** — два указателя, sliding window
+3. **Sorting & Searching** — сортировки, стандартные алгоритмы поиска
+4. **Dynamic Programming** — динамическое программирование
+5. **Graphs (DFS/BFS)** — графы, обходы в глубину и ширину
+6. **Greedy** — жадные алгоритмы
+7. **Number Theory** — теория чисел (НОД, простые числа, модульная арифметика)
+8. **Data Structures** — структуры данных (стек, очередь, set, map, heap)
+9. **Strings** — работа со строками, pattern matching
+10. **Geometry** — вычислительная геометрия
+
+**Алгоритм для каждой темы:**
+
 ```
-Оцени свои знания по основным темам от 1 до 10:
-(1 = не знаком, 5 = базовое понимание, 10 = эксперт)
+Начинаем с темы "{topic}".
 
-Я буду задавать по одной теме, введи цифру 1-10:
+Вопрос 1 (базовый): Что такое {topic}? Когда оно применяется?
 ```
 
-Темы для оценки (по очереди):
-1. **Binary Search** - бинарный поиск, поиск по ответу
-2. **Two Pointers** - два указателя, sliding window
-3. **Sorting & Searching** - сортировки, стандартные алгоритмы поиска
-4. **Dynamic Programming** - динамическое программирование
-5. **Graphs (DFS/BFS)** - графы, обходы в глубину и ширину
-6. **Greedy** - жадные алгоритмы
-7. **Number Theory** - теория чисел (НОД, простые числа, модульная арифметика)
-8. **Data Structures** - структуры данных (стек, очередь, set, map, heap)
-9. **Strings** - работа со строками, pattern matching
-10. **Geometry** - вычислительная геометрия
+Оценить ответ:
+- Не ответил / "не знаю" → **confidence = 1**, переход к следующей теме
+- Ответил грубо / неполно → **confidence = 2–3**, переход к следующей теме
+- Ответил уверенно и осмысленно → продолжить к Вопросу 2
 
-Для каждой темы запросить оценку и сохранить в `topic_confidence`.
+```
+Вопрос 2 (применение): В каких задачах / когда ты бы использовал {topic}?
+Как распознать задачу на этот паттерн?
+```
+
+Оценить ответ:
+- Не ответил / не может привести примеры → **confidence = 3–4**, конец темы
+- Ответил грубо / частично → **confidence = 4–5**, конец темы
+- Ответил уверенно с примерами → продолжить к Вопросу 3
+
+```
+Вопрос 3 (сложный): {сложный вопрос для темы — edge case, типичная ошибка, нетривиальный случай}
+```
+
+Оценить ответ:
+- Не ответил / не может объяснить → **confidence = 5–6**, конец темы
+- Ответил правильно → **confidence = 7–8**, конец темы
+- Ответил развёрнуто, с примерами, объяснил почему → **confidence = 9–10**, конец темы
+
+**Примеры вопросов по темам:**
+
+| Тема | Вопрос 1 (базовый) | Вопрос 2 (применение) | Вопрос 3 (сложный) |
+|------|--------------------|-----------------------|---------------------|
+| Binary Search | Что такое бинарный поиск и когда он работает? | Когда применять поиск по ответу vs по массиву? | Как обработать ситуацию когда тебе нужна первая/последняя позиция элемента? |
+| Two Pointers | Что такое метод двух указателей? | Как распознать задачу на два указателя? | Как связаны sliding window и два указателя? |
+| Sorting | Как работает быстрая сортировка? | Когда нужна сортировка слияния vs быстрая? | Как сортировка помогает в задачах на инверсии? |
+| DP | Что такое динамическое программирование? | Как различить задачу на DP и greedy? | Как перейти от рекуррентного решения к итеративному? |
+| Graphs | Что такие графы и основные способы обхода? | Как выбрать между DFS и BFS? | Как обнаружить отрицательный цикл? |
+| Greedy | Что такие жадные алгоритмы? | Как доказать что жадный подход верен? | Когда жадный не работает и нужен DP? |
+| Number Theory | Что такая теория чисел в CP? | Когда применять НОД / НОК? | Как быстро проверить простоту числа? |
+| Data Structures | Какие базовые структуры данных знаешь? | Когда использовать set vs map vs priority_queue? | Как реализуется segment tree и для чего? |
+| Strings | Какие алгоритмы для работы со строками знаешь? | Когда применять KMP vs Z-function? | Как работает суффиксный массив? |
+| Geometry | Что такая вычислительная геометрия? | Как определить пересечение двух отрезков? | Как обработать precision issues с вещественными числами? |
+
+**Вывод после оценки всех тем:**
+```
+Оценка завершена! Вот твоя карта знаний:
+
+{topic1}: {confidence1}/10
+{topic2}: {confidence2}/10
+...
+
+Слабые темы (< 6): {список}
+Сильные темы (≥ 8): {список}
+```
+
+Сохранить оценки в `topic_confidence`.
 
 #### Шаг 5: Сравнение с CF статистикой (если есть)
 Если есть данные CF:
@@ -238,27 +306,37 @@ priority_weak = [t for t in weak_topics if t in focus]
 
 #### Шаг 8: Создание и сохранение профиля
 
-1. Загрузить шаблон:
+1. Загрузить шаблоны:
 ```bash
-cat .claude/skills/competitive-coach/templates/user_profile.json
+cat .claude/skills/competitive-coach/templates/core_profile.json
+cat .claude/skills/competitive-coach/templates/stats_profile.json
 ```
 
-2. Заполнить данные:
+2. Заполнить core.json:
+   - `version` = "2.0"
    - `initialized_at` = текущая дата ISO 8601
    - `user_info.*` = собранные данные
    - `knowledge_assessment.topic_confidence` = оценки из шага 4
    - `knowledge_assessment.weak_topics` = темы с confidence < 6
    - `knowledge_assessment.strong_topics` = темы с confidence >= 8
-   - `codeforces_analysis.*` = данные из CF API
    - `training_plan.*` = сгенерированный план
+   - `recent_summary` = []
+   - `last_updated` = текущая дата ISO 8601
 
-3. Сохранить профиль:
+3. Заполнить stats.json:
+   - `version` = "2.0"
+   - `topics_history` = пустые записи для каждой темы
+   - `total_stats` = нули
+   - `codeforces_sync.*` = данные из CF API (если есть)
+   - `session_history` = []
+
+4. Сохранить профили:
 ```bash
-# Сохранить в coach/profile.json
-# Создать backup в coach/profile.backup.json
+# Сохранить в coach/core.json и coach/stats.json
+# Создать backup в coach/core.backup.json
 ```
 
-4. Создать `topics_history` структуру:
+5. Создать `topics_history` в stats.json:
 ```json
 {
   "binary_search": {
@@ -266,10 +344,10 @@ cat .claude/skills/competitive-coach/templates/user_profile.json
     "solved": 0,
     "last_practice": null,
     "avg_difficulty": 0
-  },
-  // ... для каждой темы
+  }
 }
 ```
+(для каждой темы)
 
 #### Шаг 9: Показать итоговый план
 ```
@@ -304,40 +382,29 @@ cat .claude/skills/competitive-coach/templates/user_profile.json
 
 ---
 
-## Команда: /coach
+## Основное меню
 
-**Цель**: Основная команда для тренировок - выбор между обучением и практикой.
-
-### Предварительная проверка
-
-```bash
-if [ ! -f coach/profile.json ]; then
-    echo "Профиль не найден. Сначала запусти /init_coach"
-    exit
-fi
-```
-
-Загрузить профиль:
-```bash
-profile=$(cat coach/profile.json)
-```
-
-### Меню выбора режима
+После загрузки core.json:
 
 ```
 Привет, {handle}! Чем займемся сегодня?
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 1. 📚 ОБУЧЕНИЕ - изучить новую тему или подтянуть слабую
-2. 💻 ПРАКТИКА - решить задачу с моей поддержкой
+2. 💻 ПРАКТИКА - решить задачу
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Выбери номер режима (1 или 2):
 ```
 
+---
+
 ### Режим 1: Обучение
 
 #### 1.1. Выбор темы
+
+Выбор темы опирается на **profile** (confidence, recent_summary из core.json), а НЕ на существование файлов в editorials/.
+
 ```
 📚 Режим обучения
 
@@ -352,16 +419,20 @@ profile=$(cat coach/profile.json)
 
 Пользователь выбирает тему → сохранить в `current_session.topic`
 
-#### 1.2. Проверка материалов
-```bash
-# Проверить есть ли материалы
-if [ -d "editorials/{topic}" ]; then
-    echo "✓ Материалы найдены"
-    has_materials=true
-else
-    echo "⚠ Материалов по этой теме пока нет"
-    has_materials=false
-fi
+#### 1.2. Проверка и подготовка материалов
+
+Источник истины — **profile** (confidence, session_history в stats.json), а не файлы в editorials/.
+
+Логика:
+```python
+# Проверить есть ли файлы в editorials/ (для удобства, не для решения)
+if [ -d "editorials/{topic}" ]:
+    # Файлы есть — использовать как материалы для обучения
+    has_materials = true
+else:
+    # Файлов нет — создаём новые материалы В ЛЮБОМ СЛУЧАЕ
+    # (даже если тема была в session_history — не считаем что "уже изучена")
+    has_materials = false
 ```
 
 Если `has_materials == false`:
@@ -369,21 +440,21 @@ fi
 Материалов по теме "{topic}" пока нет.
 
 Хочешь чтобы я создал структурированные заметки? (да/нет)
-Это займет несколько минут, но ты получишь:
+Это поможет:
 - Карту знаний по теме
 - Атомарные заметки с концепциями
 - Примеры кода в библиотеке
 ```
 
-Если "да" → запустить встроенную логику `/topic_analysis` (см. раздел "Встроенные команды" ниже)
+Если "да" → запустить встроенную логику создания материалов (см. раздел "Встроенные команды" ниже)
 
 #### 1.3. Изучение материалов
 
-Перед показом материалов: проверить есть ли предыдущие сессии по этой теме с weak_subtopics:
+Перед показом материалов: проверить есть ли предыдущие сессии по этой теме с weak_subtopics (из stats.json → session_history):
 ```python
 # Найти последнюю сессию по этой теме
 prev_weak = []
-for session in reversed(profile.session_history):
+for session in reversed(stats.session_history):
     if session["mode"] == "learning" and session["topic"] == topic:
         prev_weak = session.get("weak_subtopics", [])
         break
@@ -397,7 +468,7 @@ for session in reversed(profile.session_history):
 Давай начнем с этого!
 ```
 
-Показать содержимое `editorials/{topic}/index.md`
+Показать содержимое `editorials/{topic}/index.md` (если есть)
 
 ```
 Прочитал? Вот ключевые концепции, которые важно понять:
@@ -493,10 +564,10 @@ Quiz завершен!
 
 {показать условие через WebFetch}
 
-Попробуй решить! Я буду помогать наводящими вопросами.
+Попробуй решить!
 ```
 
-Далее работать в режиме диалога (как в режиме практики, см. ниже), но с упрощенной задачей.
+Далее работать в режиме диалога (как в режиме практики ниже).
 
 #### 1.6. Код из библиотеки
 
@@ -516,17 +587,33 @@ Quiz завершен!
 #### 1.7. Обновление профиля
 
 ```python
-# Обновить confidence
-old_confidence = profile.knowledge_assessment.topic_confidence[topic]
+# Обновить confidence в core.json
+old_confidence = core.knowledge_assessment.topic_confidence[topic]
 new_confidence = min(10, old_confidence + confidence_increase)
 
-profile.knowledge_assessment.topic_confidence[topic] = new_confidence
+core.knowledge_assessment.topic_confidence[topic] = new_confidence
 
 # Обновить weak_topics если стал сильным
-if new_confidence >= 6 and topic in profile.knowledge_assessment.weak_topics:
-    profile.knowledge_assessment.weak_topics.remove(topic)
+if new_confidence >= 6 and topic in core.knowledge_assessment.weak_topics:
+    core.knowledge_assessment.weak_topics.remove(topic)
 
-# Добавить в историю
+# Добавить в recent_summary (core.json) — кратко
+summary_entry = {
+    "date": current_date_iso,
+    "mode": "learning",
+    "outcome": "completed",
+    "topics": [topic],
+    "confidence_delta": {topic: new_confidence - old_confidence}
+}
+# Хранить только последние 10 записей
+core.recent_summary.append(summary_entry)
+if len(core.recent_summary) > 10:
+    core.recent_summary = core.recent_summary[-10:]
+
+core.last_updated = current_date_iso
+save_core(core)
+
+# Добавить полную запись в session_history (stats.json)
 session_record = {
     "date": current_date_iso,
     "mode": "learning",
@@ -535,15 +622,15 @@ session_record = {
     "confidence_before": old_confidence,
     "confidence_after": new_confidence,
     "duration_minutes": elapsed_time,
-    "materials_created": not has_materials,  # True если создавали
-    "weak_subtopics": weak_subtopics,        # Что не понял в этой теме
-    "strong_subtopics": strong_subtopics     # Что усвоил уверенно
+    "materials_created": not has_materials,
+    "weak_subtopics": weak_subtopics,
+    "strong_subtopics": strong_subtopics
 }
 
-profile.session_history.append(session_record)
-
-# Сохранить профиль
-save_profile(profile)
+stats.session_history.append(session_record)
+stats.total_stats.total_sessions += 1
+stats.total_stats.learning_sessions += 1
+save_stats(stats)
 ```
 
 Показать итог:
@@ -581,6 +668,8 @@ Confidence: {old_confidence} → {new_confidence}
 
 ### Режим 2: Практика
 
+Claude в режиме практики — **консультант, не инструктор**. Не задаёт наводящие вопросы сам, не подтверждает и не опровергает наблюдения проактивно. Просто отвечает на вопросы пользователя, когда тот спрашивает. Не намекает на решение.
+
 #### 2.1. Выбор задачи
 
 ```
@@ -604,33 +693,32 @@ Confidence: {old_confidence} → {new_confidence}
 
 **Вариант 2**: Рекомендация по слабым темам
 ```python
+# Загрузить stats.json для topics_history
+stats = load_stats()
+
 # Взять самую слабую тему с которой давно не работал
 weak_topic = sorted(
     weak_topics,
     key=lambda t: (
         topic_confidence[t],  # приоритет самым слабым
-        topics_history[t].last_practice or "1970-01-01"  # давно не практиковал
+        stats.topics_history.get(t, {}).get("last_practice") or "1970-01-01"
     )
 )[0]
 
-# Найти задачу на CF
-difficulty = max(800, user_rating - 100, user_rating + 100)
-problem_url = find_cf_problem(tag=weak_topic, rating=difficulty)
-
-print(f"Рекомендую задачу на тему '{weak_topic}' (твоя слабая сторона):")
-print(problem_url)
+# Рекомендация: попросить пользователя найти задачу
+print(f"Рекомендую тему '{weak_topic}' (твоя слабая сторона).")
+print(f"Найди задачу на эту тему на Codeforces (рейтинг ~{max(800, user_rating)})")
+print(f"И кинь мне ссылку!")
 ```
 
 **Вариант 3**: По плану тренировок
 ```python
 # Взять текущий фокус из плана
 focus_topic = training_plan.focus_areas[current_day % len(focus_areas)]
-difficulty = user_rating  # по уровню
 
-problem_url = find_cf_problem(tag=focus_topic, rating=difficulty)
-
-print(f"По плану сегодня тема '{focus_topic}':")
-print(problem_url)
+print(f"По плану сегодня тема '{focus_topic}'.")
+print(f"Найди задачу на эту тему на Codeforces (рейтинг ~{user_rating})")
+print(f"И кинь мне ссылку!")
 ```
 
 #### 2.2. Чтение условия задачи
@@ -642,6 +730,17 @@ print(problem_url)
 ```bash
 # Использовать WebFetch для получения условия
 problem_text = web_fetch(problem_url, "Extract problem statement")
+```
+
+Если WebFetch не работает (задача требует авторизации или URL недоступен):
+```
+⚠ Не могу загрузить условие по ссылке.
+
+Возможные причины:
+- Задача закрыта / требует авторизации
+- Ошибка сети
+
+Скопируй условие задачи сюда и я работаю с ним.
 ```
 
 Показать краткий пересказ:
@@ -659,13 +758,12 @@ problem_text = web_fetch(problem_url, "Extract problem statement")
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Прочитал условие? Начинай размышлять!
-Пиши свои мысли, идеи, вопросы - я буду помогать наводящими вопросами.
-
 Полное условие: {problem_url}
+
+Решай! Если есть вопросы — спрашивай.
 ```
 
-#### 2.3. Диалоговая помощь
+#### 2.3. Диалог (режим консультанта)
 
 Инициализировать контекст сессии:
 ```python
@@ -680,42 +778,14 @@ session_context = {
 }
 ```
 
-**Режим диалога** - вести беседу, помогая пользователю:
+**Модель диалога — консультант:**
 
-1. **Понимание задачи**
-   - Если пользователь не понял условие: переформулировать, дать примеры
-   - Спросить: "Что нужно найти? Какие ограничения?"
-
-2. **Наблюдения**
-   - Когда пользователь замечает свойства: подтвердить правильные, мягко скорректировать неправильные
-   - Сохранять в `session_context.thoughts`
-   - Примеры:
-     - User: "Массив отсортирован" → "✓ Верно! Как это можно использовать?"
-     - User: "Нужен O(n²)" → "⚠ Подумай о ограничениях: n ≤ 10⁵. O(n²) успеет?"
-
-3. **Идеи подходов**
-   - Если пользователь предлагает подход: задать вопросы о корректности и сложности
-   - НЕ говорить сразу "правильно" или "неправильно"
-   - Примеры вопросов:
-     - "Какая сложность у твоего подхода?"
-     - "Будет ли это работать если {edge case}?"
-     - "А что если n = 10⁵?"
-
-4. **Подсказки** (если застрял > 10-15 минут):
-   - Level 1: "Обрати внимание на {свойство задачи}"
-   - Level 2: "Это классическая задача на {паттерн}"
-   - Level 3: "Попробуй подумать в направлении {техника}"
-   - Level 4: "Ключевое наблюдение: {hint}" (только если совсем застрял)
-
-5. **Моменты прорыва**
-   - Когда пользователь понимает ключевую идею: отметить и подтвердить
-   - Сохранить в `session_context.breakthroughs`
-   - Пример: "🎯 Отлично! Монотонность → можно бинпоиск. Это ключ к решению!"
-
-6. **Реализация**
-   - Когда пользователь начинает кодить: быть готовым помочь с багами
-   - Не писать код за него, но указывать на ошибки
-   - Если TLE/WA: спросить про граничные случаи, переполнения, off-by-one
+- Claude НЕ задаёт наводящие вопросы первым
+- Claude НЕ подтверждает / НЕ опровергает наблюдения проактивно
+- Если пользователь прямо спрашивает "Это верно?" или "Как мне X?" — отвечает честно и прямо
+- Если пользователь спрашивает про сложность / корректность подхода — помогает проанализировать
+- Если пользователь просит объяснить что-то из условия — объясняет
+- Claude запоминает все наблюдения и идеи пользователя в session_context для итогового разбора
 
 **Сохранение прогресса** в течение диалога:
 ```python
@@ -723,8 +793,7 @@ session_context = {
 if is_observation(user_message):
     session_context.thoughts.append({
         "text": user_message,
-        "timestamp": current_time,
-        "is_correct": evaluate_observation(user_message, problem_tags)
+        "timestamp": current_time
     })
 
 if is_breakthrough(user_message):
@@ -753,10 +822,7 @@ if is_breakthrough(user_message):
 ⏱ Время: {elapsed_minutes} минут
 
 ✅ Что получилось:
-{перечислить правильные наблюдения из session_context.thoughts}
-
-⚠ Что не сразу:
-{перечислить неправильные попытки или долгие заминки}
+{перечислить ключевые наблюдения из session_context.thoughts}
 
 💡 Ключевая идея:
 > {главный breakthrough из session_context.breakthroughs}
@@ -773,57 +839,26 @@ if is_breakthrough(user_message):
 Это поможет вспомнить решение потом.
 ```
 
-Если "да" → использовать встроенную логику `/solve_problem` (см. раздел "Встроенные команды")
+Если "да" → использовать встроенную логику разбора (см. раздел "Встроенные команды")
 
 #### 2.5. Если не решил
 
-Если пользователь пишет "сдаюсь" / "не могу" / "покажи решение":
+Если пользователь пишет "сдаюсь" / "не могу":
 
 ```
 Не проблема! Иногда задача оказывается слишком сложной.
 
-Хочешь чтобы я:
-1. Дал еще одну подсказку (не решение, но сильный hint)
-2. Показал полное решение с объяснением
-3. Предложил похожую, но проще задачу
+Рекомендую: найти разбор этой задачи (editorial на CF или в интернете),
+вставить его в competitive_task.md после "# Разбор" и запустить
+обсуждение через claude.md (Режим 1 — объяснение готового разбора).
 
-Выбери (1-3):
-```
-
-**Вариант 1**: Сильная подсказка
-```
-Вот ключевое наблюдение, которое ведет к решению:
-
-{показать главную идею, но не код}
-
-Попробуй еще раз с этим знанием!
-```
-
-**Вариант 2**: Полное решение
-```
-Понял. Вот полное решение:
-
-{показать код с комментариями}
-
-Разбор:
-{объяснить approach, сложность, key insights}
-
-Сохраню это в твою коллекцию неудачных попыток -
-полезно вернуться через неделю и попробовать снова!
+Это лучший способ разобрать задачу — ты увидишь где именно потерялся.
 ```
 
 Сохранить как unsolved:
 ```python
 session_context.outcome = "unsolved"
-session_context.reason = "too_difficult"  # или "gave_up"
-```
-
-**Вариант 3**: Похожая задача
-```
-Вот похожая задача, но попроще:
-{найти задачу с теми же тегами, но rating - 200}
-
-Попробуй её - если решишь, вернешься к этой с новым пониманием!
+session_context.reason = "gave_up"
 ```
 
 #### 2.6. Обновление профиля
@@ -832,39 +867,54 @@ session_context.reason = "too_difficult"  # или "gave_up"
 # Определить outcome
 outcome = "solved" if user_solved else "unsolved"
 
+# Загрузить stats.json
+stats = load_stats()
+
 # Обновить topics_history
 for tag in problem_tags:
-    if tag not in topics_history:
-        topics_history[tag] = {
+    if tag not in stats.topics_history:
+        stats.topics_history[tag] = {
             "attempts": 0,
             "solved": 0,
             "last_practice": None,
             "avg_difficulty": 0
         }
 
-    topics_history[tag].attempts += 1
+    stats.topics_history[tag].attempts += 1
     if outcome == "solved":
-        topics_history[tag].solved += 1
-    topics_history[tag].last_practice = current_date
+        stats.topics_history[tag].solved += 1
+    stats.topics_history[tag].last_practice = current_date
 
     # Обновить avg_difficulty
-    old_avg = topics_history[tag].avg_difficulty
-    count = topics_history[tag].attempts
+    old_avg = stats.topics_history[tag].avg_difficulty
+    count = stats.topics_history[tag].attempts
     new_avg = (old_avg * (count - 1) + problem_rating) / count
-    topics_history[tag].avg_difficulty = new_avg
+    stats.topics_history[tag].avg_difficulty = new_avg
 
-# Обновить confidence (если решил сложную задачу)
+# Обновить confidence в core.json (если решил сложную задачу)
 if outcome == "solved":
     for tag in problem_tags:
-        if tag in topic_confidence:
-            current_conf = topic_confidence[tag]
-
-            # Increase confidence если задача была на уровне или сложнее
+        if tag in core.knowledge_assessment.topic_confidence:
+            current_conf = core.knowledge_assessment.topic_confidence[tag]
             if problem_rating >= user_rating - 100:
                 new_conf = min(10, current_conf + 1)
-                topic_confidence[tag] = new_conf
+                core.knowledge_assessment.topic_confidence[tag] = new_conf
 
-# Добавить в session_history
+# recent_summary в core.json
+summary_entry = {
+    "date": current_date_iso,
+    "mode": "practice",
+    "outcome": outcome,
+    "topics": problem_tags,
+    "confidence_delta": {}  # заполнить если есть изменения
+}
+core.recent_summary.append(summary_entry)
+if len(core.recent_summary) > 10:
+    core.recent_summary = core.recent_summary[-10:]
+core.last_updated = current_date_iso
+save_core(core)
+
+# Полная запись в stats.json
 session_record = {
     "date": current_date_iso,
     "mode": "practice",
@@ -877,10 +927,17 @@ session_record = {
     "attempts_count": len(session_context.attempts)
 }
 
-profile.session_history.append(session_record)
-
-# Сохранить профиль
-save_profile(profile)
+stats.session_history.append(session_record)
+stats.total_stats.total_sessions += 1
+stats.total_stats.practice_sessions += 1
+if outcome == "solved":
+    stats.total_stats.total_solved += 1
+# Пересчитать success_rate
+if stats.total_stats.practice_sessions > 0:
+    stats.total_stats.success_rate = round(
+        stats.total_stats.total_solved / stats.total_stats.practice_sessions * 100, 1
+    )
+save_stats(stats)
 
 # Опционально: сохранить детальный лог в sessions/
 if detailed_log_requested:
@@ -903,7 +960,6 @@ if detailed_log_requested:
 }
 
 Всего решено задач: {total_solved_count}
-Текущий streak: {current_streak} дней
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -916,7 +972,7 @@ if detailed_log_requested:
 
 ### /coach stats
 
-Показать статистику прогресса:
+Загрузить core.json **и** stats.json. Показать статистику прогресса:
 
 ```
 📊 Твоя статистика
@@ -925,37 +981,35 @@ if detailed_log_requested:
 👤 Профиль
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Handle: {codeforces_handle}
-Рейтинг: {current_rating}
+Рейтинг: {stats.codeforces_sync.rating}
 Цель: {target_rating} (осталось +{target - current})
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📈 Прогресс с момента инициализации
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Дней тренировок: {days_since_init}
-Всего сессий: {len(session_history)}
-  - Обучение: {learning_sessions_count}
-  - Практика: {practice_sessions_count}
+Всего сессий: {stats.total_stats.total_sessions}
+  - Обучение: {stats.total_stats.learning_sessions}
+  - Практика: {stats.total_stats.practice_sessions}
 
-Решено задач: {solved_problems_count}
-Успешность: {success_rate}%
+Решено задач: {stats.total_stats.total_solved}
+Успешность: {stats.total_stats.success_rate}%
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 💪 Confidence по темам
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 {for topic, conf in sorted(topic_confidence.items(), key=lambda x: x[1], reverse=True):
     bar = "█" * conf + "░" * (10 - conf)
-    change = calculate_change_since_init(topic)
-    change_str = f"(+{change})" if change > 0 else ""
-    print(f"{topic:20} {bar} {conf}/10 {change_str}")
+    print(f"{topic:20} {bar} {conf}/10")
 }
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🎯 Активность по темам (последние 30 дней)
+🎯 Активность по темам
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-{for topic in sorted(topics_history, key=lambda t: topics_history[t].attempts, reverse=True)[:10]:
-    history = topics_history[topic]
+{for topic in sorted(stats.topics_history, key=lambda t: stats.topics_history[t].attempts, reverse=True)[:10]:
+    history = stats.topics_history[topic]
     success = history.solved / history.attempts * 100 if history.attempts > 0 else 0
-    print(f"{topic:20} {history.attempts:3} attempts | {history.solved:3} solved | {success:.0f}% success")
+    print(f"{topic:20} {history.attempts:3} попыток | {history.solved:3} решено | {success:.0f}% успеха")
 }
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -963,13 +1017,13 @@ Handle: {codeforces_handle}
 
 ### /coach sync
 
-Синхронизировать данные с Codeforces:
+Синхронизировать данные с Codeforces. Обновляет stats.json:
 
 ```
 🔄 Синхронизация с Codeforces...
 
 {запустить codeforces_api.py снова}
-{обновить codeforces_analysis в профиле}
+{обновить codeforces_sync в stats.json}
 {сравнить со старыми данными}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -993,7 +1047,7 @@ Handle: {codeforces_handle}
 📅 Твой план тренировок
 
 {загрузить templates/training_plan.md}
-{заполнить плейсхолдеры данными из профиля}
+{заполнить плейсхолдеры данными из core.json}
 {показать план}
 ```
 
@@ -1004,30 +1058,33 @@ Handle: {codeforces_handle}
 ```
 ⚠ Сброс прогресса по теме "{topic}"
 
-Это удалит:
-- Историю решенных задач по теме
+Это сбросит:
 - Confidence (вернется к 5)
+- Историю в topics_history
 
 Уверен? (да/нет)
 ```
 
 Если "да":
 ```python
-topic_confidence[topic] = 5
-topics_history[topic] = {
+core.knowledge_assessment.topic_confidence[topic] = 5
+
+# Обновить weak/strong
+if topic in core.knowledge_assessment.strong_topics:
+    core.knowledge_assessment.strong_topics.remove(topic)
+if topic not in core.knowledge_assessment.weak_topics:
+    core.knowledge_assessment.weak_topics.append(topic)
+save_core(core)
+
+# Сбросить topics_history в stats.json
+stats = load_stats()
+stats.topics_history[topic] = {
     "attempts": 0,
     "solved": 0,
     "last_practice": None,
     "avg_difficulty": 0
 }
-
-# Удалить из strong_topics, добавить в weak_topics если нужно
-if topic in strong_topics:
-    strong_topics.remove(topic)
-if topic not in weak_topics:
-    weak_topics.append(topic)
-
-save_profile(profile)
+save_stats(stats)
 
 print(f"✅ Тема '{topic}' сброшена. Начни заново с /coach!")
 ```
@@ -1049,7 +1106,7 @@ print(f"✅ Тема '{topic}' сброшена. Начни заново с /coa
 ```
 Создаю структурированные заметки по теме "{topic}"...
 
-Это займет 2-3 минуты. Я создам:
+Я создам:
 - Карту знаний (граф концепций)
 - Атомарные заметки (каждая концепция отдельно)
 - Примеры кода в библиотеке
@@ -1069,7 +1126,7 @@ print(f"✅ Тема '{topic}' сброшена. Начни заново с /coa
 
 3. Для каждой концепции создать заметку в формате:
    ```markdown
-   # {Concept Name}
+   # {Название концепции}
 
    ## Определение
    {краткое определение}
@@ -1087,29 +1144,46 @@ print(f"✅ Тема '{topic}' сброшена. Начни заново с /coa
    [[ссылки на другие концепции]]
    ```
 
-4. Создать код в library:
+4. **Создать код в library** в формате двойного блока из claude.md:
+
+   Формат файлов в library описан в `claude.md` раздел "Работа с библиотекой".
+   Каждый файл должен содержать:
+   ```
+   // ============ НАЧАЛО КОПИРУЕМОГО БЛОКА ============
+   {чистый код БЕЗ комментариев — для копирования в решение}
+   // ============ КОНЕЦ КОПИРУЕМОГО БЛОКА ============
+
+   // ============ РЕАЛИЗАЦИЯ С КОММЕНТАРИЯМИ ============
+   {тот же код С подробными комментариями на русском — для изучения}
+   // ============ КОНЕЦ КОММЕНТИРОВАННОЙ ВЕРСИИ ============
+
+   // Примеры использования:
+   {пример вызова}
+   ```
+
+   Структура:
    ```
    library/{preferred_language}/{topic}/
-   ├── {algo1}.cpp   # Копируемый блок
-   └── README.md     # Объяснение когда использовать
+   ├── {algo1}.cpp   # Реализация алгоритма
+   └── README.md     # Когда использовать
    ```
 
 5. Создать index.md с картой:
    ```markdown
-   # {Topic} - Knowledge Map
+   # {Тема} — Карта знаний
 
-   ## Overview
+   ## Обзор
    {общее описание темы}
 
-   ## Core Concepts
+   ## Основные концепции
    1. [[01_concept1]] - {краткое описание}
    2. [[02_concept2]] - {краткое описание}
    ...
 
-   ## Learning Path
+   ## Путь изучения
    {рекомендуемый порядок изучения}
 
-   ## Practice Problems
+   ## Задачи для практики
    {подборка задач от простых к сложным}
    ```
 
@@ -1136,7 +1210,7 @@ print(f"✅ Тема '{topic}' сброшена. Начни заново с /coa
 
 **Формат editorial** (из `task_editorial_example.md`):
 ```markdown
-# {Problem Name}
+# {Название задачи}
 
 ## Ссылка
 {problem_url}
@@ -1145,7 +1219,7 @@ print(f"✅ Тема '{topic}' сброшена. Начни заново с /coa
 {tags}
 
 ## Что правильно понял
-{мысли из session_context.thoughts с is_correct = true}
+{мысли из session_context.thoughts}
 
 ## Пропущенный шаг
 {что не сразу заметил, breakthroughs которые пришли позже}
@@ -1202,16 +1276,24 @@ editorials/{problem_id}_{problem_name}.md
 
 ### Профиль поврежден
 ```bash
-if ! jq empty coach/profile.json 2>/dev/null; then
+# Проверка при загрузке core.json
+if ! jq empty coach/core.json 2>/dev/null; then
     echo "⚠ Профиль поврежден!"
-    if [ -f coach/profile.backup.json ]; then
+    if [ -f coach/core.backup.json ]; then
         echo "Найден backup. Восстановить? (да/нет)"
-        # если да: cp coach/profile.backup.json coach/profile.json
+        # если да: cp coach/core.backup.json coach/core.json
     else
         echo "Backup не найден. Создать новый профиль? (да/нет)"
-        # если да: запустить /init_coach
+        # если да: запустить инициализацию
     fi
 fi
+```
+
+### WebFetch не работает
+```
+⚠ Не могу загрузить условие задачи по ссылке.
+
+Скопируй условие задачи сюда — я работаю с ним напрямую.
 ```
 
 ### Тема не найдена в editorials
@@ -1226,40 +1308,23 @@ fi
 Что выбираешь? (1-3)
 ```
 
-### Не могу найти задачу с нужными параметрами
-```
-Не нашел задачу на CF с параметрами:
-- Тема: {topic}
-- Сложность: {rating}
-
-Могу предложить:
-1. Задачу на эту тему, но другой сложности
-2. Задачу на другую слабую тему
-3. Ввести ссылку на задачу вручную
-
-Что выбираешь? (1-3)
-```
-
 ---
 
 ## Технические детали
 
-### Формат хранения профиля
+### Структура профиля v2
 
-Полная структура `coach/profile.json`:
+**coach/core.json** — загружается при каждом `/coach`:
 ```json
 {
-  "version": "1.0",
+  "version": "2.0",
   "initialized_at": "2026-02-02T15:00:00Z",
   "user_info": {
     "codeforces_handle": "handle",
-    "has_existing_library": true,
     "preferred_language": "cpp",
     "worked_with_claude": false
   },
   "knowledge_assessment": {
-    "strong_topics": ["binary_search", "greedy"],
-    "weak_topics": ["dp", "graphs"],
     "topic_confidence": {
       "binary_search": 8,
       "two_pointers": 6,
@@ -1271,19 +1336,9 @@ fi
       "data_structures": 5,
       "strings": 4,
       "geometry": 3
-    }
-  },
-  "codeforces_analysis": {
-    "rating": 1543,
-    "solved_count": 234,
-    "tags_distribution": {
-      "implementation": 45,
-      "greedy": 38,
-      "dp": 12
     },
-    "frequent_tags": ["implementation", "greedy", "math"],
-    "rare_tags": ["geometry", "strings", "flows"],
-    "last_sync": "2026-02-02T15:00:00Z"
+    "weak_topics": ["dp", "graphs"],
+    "strong_topics": ["binary_search", "greedy"]
   },
   "training_plan": {
     "current_phase": "intermediate",
@@ -1295,6 +1350,50 @@ fi
     },
     "strategy": "focused"
   },
+  "recent_summary": [
+    {
+      "date": "2026-02-03",
+      "mode": "practice",
+      "outcome": "solved",
+      "topics": ["dp"],
+      "confidence_delta": { "dp": 1 }
+    }
+  ],
+  "last_updated": "2026-02-03T15:00:00Z"
+}
+```
+
+**coach/stats.json** — загружается для `/coach stats`, `/coach sync`, и при обновлении session_history:
+```json
+{
+  "version": "2.0",
+  "topics_history": {
+    "binary_search": {
+      "attempts": 12,
+      "solved": 10,
+      "last_practice": "2026-02-02",
+      "avg_difficulty": 1450
+    }
+  },
+  "total_stats": {
+    "total_sessions": 144,
+    "learning_sessions": 30,
+    "practice_sessions": 114,
+    "total_solved": 95,
+    "success_rate": 83.3,
+    "avg_solve_time_min": 35,
+    "current_streak_days": 12,
+    "longest_streak_days": 28
+  },
+  "monthly_summaries": [],
+  "codeforces_sync": {
+    "rating": 1650,
+    "solved_count": 312,
+    "tags_distribution": {},
+    "frequent_tags": ["implementation", "dp", "greedy"],
+    "rare_tags": ["geometry", "flows"],
+    "last_sync": "2026-02-01T10:00:00Z"
+  },
   "session_history": [
     {
       "date": "2026-02-02T16:00:00Z",
@@ -1303,7 +1402,9 @@ fi
       "quiz_score": "4/5",
       "confidence_before": 6,
       "confidence_after": 8,
-      "duration_minutes": 45
+      "duration_minutes": 45,
+      "weak_subtopics": [],
+      "strong_subtopics": ["definition", "use_cases"]
     },
     {
       "date": "2026-02-02T17:00:00Z",
@@ -1316,34 +1417,38 @@ fi
       "key_insights": ["Remove prime factors separately"],
       "attempts_count": 2
     }
-  ],
-  "topics_history": {
-    "binary_search": {
-      "attempts": 12,
-      "solved": 10,
-      "last_practice": "2026-02-02",
-      "avg_difficulty": 1450
-    }
-  }
+  ]
 }
 ```
 
+**coach/sessions/** — детальные логи (не загружаются автоматически, по запросу)
+**coach/archive/** — архив старых сессий (не загружается автоматически)
+
 ### Backup стратегия
 
-При каждом сохранении профиля:
+При каждом сохранении core.json:
 ```bash
 # Создать backup перед изменением
-cp coach/profile.json coach/profile.backup.json
+cp coach/core.json coach/core.backup.json
 
 # Сохранить новую версию
-echo "$new_profile" > coach/profile.json
+echo "$new_profile" > coach/core.json
 
 # Проверить валидность JSON
-if ! jq empty coach/profile.json 2>/dev/null; then
+if ! jq empty coach/core.json 2>/dev/null; then
     echo "Error: corrupted profile"
-    cp coach/profile.backup.json coach/profile.json
+    cp coach/core.backup.json coach/core.json
 fi
 ```
+
+### Миграция из v1 в v2
+
+Если существует старый `coach/profile.json` (v1):
+```bash
+python3 .claude/skills/competitive-coach/scripts/migrate_profile.py coach/profile.json coach/
+```
+
+Скрипт создаст `core.json` + `stats.json` автоматически.
 
 ### Rate limiting для CF API
 
@@ -1355,7 +1460,7 @@ fi
 - Итого: ~4-5 сек на полный анализ
 
 Кэширование:
-- Результаты CF API кэшируются в профиле
+- Результаты CF API кэшируются в stats.json (codeforces_sync)
 - Синхронизация рекомендуется раз в день
 - При ошибке API работаем с кэшированными данными
 
@@ -1365,17 +1470,27 @@ fi
 
 ### Пример 1: Первая инициализация
 ```
-User: /init_coach
+User: /coach
 
 Bot: Привет! Я твой персональный тренер...
      Работал ли ты уже со мной?
 
 User: нет
 
-Bot: Понял! Я буду помогать через наводящие вопросы.
+Bot: Понял! Я буду консультантом: отвечаю на вопросы когда ты спрашиваешь.
 
-     Вижу у тебя уже есть библиотека кода!
+     У тебя есть свои шаблоны алгоритмов где-либо?
+
+User: да, есть несколько файлов
+
+Bot: Скопируй их в library/cpp/ и library/py/.
+     Скажи когда готов — проверю.
+
+User: скопировал
+
+Bot: Проверил:
      - C++: 5 файлов
+     - Python: 0 файлов
 
      Укажи свой никнейм на Codeforces:
 
@@ -1385,28 +1500,33 @@ Bot: Твой профиль на Codeforces:
      ━━━━━━━━━━━━━━━━━━━━━━━━━
      Рейтинг: 3821 (legendary grandmaster)
      Решено задач: 2847
-
-     Часто решаешь:
-     - implementation (35%)
-     - dp (18%)
-     - greedy (15%)
      ...
 
-Bot: Оцени свои знания по основным темам от 1 до 10:
+Bot: Начнем оценку знаний! Темы по одной.
 
-     Binary Search:
+     Binary Search: Что такое бинарный поиск и когда он применяется?
 
-User: 9
+User: Ну это поиск элемента в отсортированном массиве за O(log n)
 
-Bot: Two Pointers:
+Bot: Хорошо. А когда применять поиск по ответу?
 
-User: 8
+User: Когда есть монотонная функция и нужно найти оптимальное значение, например минимальное время
 
-... (продолжается для всех тем)
+Bot: Понял. Последний вопрос: как обработать ситуацию когда нужна первая позиция элемента среди дубликатов?
+
+User: left = mid + 1 когда arr[mid] <= target, иначе right = mid
+
+Bot: Binary Search: 9/10
+
+     Two Pointers: Что такие два указателя и когда применяются?
+
+User: не знаю особо
+
+Bot: Two Pointers: 1/10. Переходим дальше.
+
+     ... (оценка по всем темам)
 
 Bot: ✅ Профиль создан!
-
-     Твой план тренировок:
      Фаза: expert
      Цель: 4000 (сейчас 3821)
      ...
@@ -1426,15 +1546,14 @@ User: 1
 Bot: 📚 Режим обучения
 
      Твои слабые темы:
-     1. geometry (confidence: 4/10)
-     2. strings (confidence: 5/10)
+     1. two_pointers (confidence: 1/10)
+     2. geometry (confidence: 4/10)
 
      Выбери номер темы:
 
-User: 1
+User: 2
 
-Bot: ⚠ Материалов по теме "geometry" пока нет
-
+Bot: Материалов по теме "geometry" пока нет.
      Хочешь чтобы я создал заметки? (да/нет)
 
 User: да
@@ -1442,10 +1561,10 @@ User: да
 Bot: Создаю структурированные заметки по теме "geometry"...
 
      ✅ Материалы созданы!
+     📁 editorials/geometry/ — 4 заметки
+     📚 library/cpp/geometry/ — 2 файла с кодом
 
-     Давай изучим тему "geometry".
-     Сначала прочитай overview:
-
+     Давай начнем с overview:
      {показывает index.md}
 
 ... (пользователь читает)
@@ -1458,17 +1577,12 @@ Bot: Отлично! Небольшой quiz.
 
 User: Использовать векторное произведение
 
-Bot: ✓ Верно! Объясни подробнее как именно...
+Bot: Верно! Объясни подробнее как именно...
 
 ... (quiz продолжается)
 
-Bot: Quiz завершен!
-     Твой результат: 4/5
-
-     Отлично! Ты хорошо понял тему.
-
-     Теперь закрепим на практике!
-     Вот простая задача...
+Bot: Quiz завершен! Твой результат: 4/5
+     Confidence: 4 → 6
 ```
 
 ### Пример 3: Режим практики
@@ -1483,88 +1597,77 @@ User: 2
 
 Bot: 💻 Режим практики
 
-     У тебя есть конкретная задача или порекомендовать?
      1. Ввести ссылку
      2. Рекомендация по слабым темам
      3. Рекомендация по плану
 
 User: 2
 
-Bot: Рекомендую задачу на тему 'dp' (твоя слабая сторона):
-     https://codeforces.com/problemset/problem/1234/D
+Bot: Рекомендую тему 'two_pointers' (твоя слабая сторона).
+     Найди задачу на эту тему на CF (рейтинг ~1500) и кинь ссылку!
 
-     {показывает условие}
+User: https://codeforces.com/problemset/problem/1234/C
 
-     Прочитал? Начинай размышлять!
+Bot: Загружаю условие...
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     Задача: Two Sum
+     Сложность: 1400
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     {краткое условие}
+
+     Решай! Если есть вопросы — спрашивай.
 
 User: Нужно найти количество различных символов на подотрезке
 
-Bot: ✓ Верно! А как будешь это делать эффективно?
+Bot: (ничего не говорит проактивно — ждёт вопросов)
 
-User: Массив из 26 счетчиков?
+User: Правильно ли я понимаю что можно использовать массив из 26 счетчиков?
 
-Bot: Хорошая идея! А какая сложность на один запрос?
+Bot: Да, массив из 26 счетчиков — верное наблюдение. Какую сложность это даст на один запрос?
 
 User: O(26) = O(1)
 
-Bot: ✓ Точно! А как обновлять счетчики при добавлении/удалении символа?
+Bot: Верно.
 
-User: Префиксные суммы?
-
-Bot: Подумай еще. Тут не просто сумма символов нужна, а количество уникальных.
-     Как можешь хранить информацию о каждом символе отдельно?
-
-... (диалог продолжается)
-
-User: Понял! Segment tree где каждая вершина хранит set символов!
-
-Bot: 🎯 Отлично! Это ключевая идея. Теперь кодируй!
-
-... (пользователь пишет код)
+... (пользователь продолжает, Claude отвечает только на вопросы)
 
 User: Accepted!
 
 Bot: 🎉 Поздравляю с AC!
-
      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
      📊 Итог: ✅ Решено
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
      ⏱ Время: 35 минут
-
-     ✅ Что получилось:
-     - Правильно понял что нужен эффективный подсчет уникальных
-     - Заметил что segment tree подходит
-
-     💡 Ключевая идея:
-     > Segment tree с битовой маской символов вместо суммы
-
-     🏷 Темы: data_structures, bitmasks
+     💡 Ключевая идея: ...
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
      Хочешь создать детальный разбор? (да/нет)
 
 User: да
 
 Bot: ✅ Разбор сохранен!
-     📝 editorials/1234D_distinct_characters.md
+     📝 editorials/1234C_two_sum.md
 ```
 
 ---
 
 ## Заметки по реализации
 
-1. **Все команды через один skill**: `/init_coach` и `/coach` - это один SKILL.md, логика различается по вызову.
+1. **Все команды через один skill**: `/coach` — единая точка входа, логика различается по аргументу.
 
-2. **Профиль - единственный источник истины**: Все данные в `coach/profile.json`, никаких других источников.
+2. **Профиль v2 — два файла**: `core.json` загружается всегда (минимум данных), `stats.json` загружается только когда нужна полная статистика или session_history.
 
-3. **Graceful degradation**: Если CF API недоступен - работаем без него. Если материалов нет - создаем или работаем без них.
+3. **Graceful degradation**: Если CF API недоступен — работаем без него. Если материалов нет — создаем или работаем без них. Если WebFetch не работает — просим скопировать условие.
 
-4. **Наводящие вопросы, не решения**: В режиме практики НИКОГДА не давать готовый код, только hints и вопросы.
+4. **Консультант, не инструктор**: В режиме практики Claude НЕ задаёт наводящие вопросы первым и НЕ подтверждает наблюдения проактивно. Отвечает только когда пользователь спрашивает.
 
 5. **Обновление confidence постепенное**: +1-2 за сессию, не больше. Нужно время чтобы тема стала "strong".
 
-6. **Session history ограничен**: Хранить только краткие summary (50-100 chars на сессию), полные логи в отдельных файлах.
+6. **recent_summary ограничен 10 записями**: Полная история в stats.json. core.json не растет со временем.
 
-7. **Backup при каждом сохранении**: Профиль - критичные данные, всегда создавать backup.
+7. **Backup при каждом сохранении core.json**: Профиль — критичные данные, всегда создавать backup.
 
-8. **Интеграция существующих команд**: Не дублировать логику `/topic_analysis` и `/solve_problem`, использовать их внутри `/coach`.
+8. **Editorials — удобство, не источник истины**: Наличие файлов в editorials/ не означает что тема "изучена". Источник истины — confidence и session_history в profile.
+
+9. **Миграция из v1**: Скрипт `scripts/migrate_profile.py` конвертирует старый profile.json в core.json + stats.json.
+
+10. **Интеграция существующих команд**: Не дублировать логику `/topic_analysis` и `/solve_problem`, использовать их внутри `/coach`.

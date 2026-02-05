@@ -1,0 +1,24 @@
+{
+  "version": "2.0",
+  "topics_history": {},
+  "total_stats": {
+    "total_sessions": 0,
+    "learning_sessions": 0,
+    "practice_sessions": 0,
+    "total_solved": 0,
+    "success_rate": 0,
+    "avg_solve_time_min": 0,
+    "current_streak_days": 0,
+    "longest_streak_days": 0
+  },
+  "monthly_summaries": [],
+  "codeforces_sync": {
+    "rating": 0,
+    "solved_count": 0,
+    "tags_distribution": {},
+    "frequent_tags": [],
+    "rare_tags": [],
+    "last_sync": ""
+  },
+  "session_history": []
+}
