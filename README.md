@@ -252,7 +252,7 @@ competitive/
 /coach sync         # Синхронизация с Codeforces (обновить статистику)
 /coach drill        # Набить код из библиотеки по памяти (автовыбор темы)
 /coach drill topic  # Набить конкретную тему (например: /coach drill prime_factorization)
-/coach contest      # Проанализировать результаты контеста (ссылка в solution/WORKSPACE.md)
+/coach contest      # Проанализировать результаты контеста (ссылка в solution/CONTEST.md)
 /coach init         # Переинициализировать профиль (создать новый)
 /coach reset topic  # Сбросить прогресс по конкретной теме
 ```
