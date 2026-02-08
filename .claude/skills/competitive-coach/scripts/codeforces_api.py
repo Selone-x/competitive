@@ -74,6 +74,77 @@ class CodeforcesAPI:
 
         return list(solved_problems)
 
+    def get_contest_submissions(self, handle, contest_id):
+        """Get user's submissions for specific contest with per-problem statistics"""
+        submissions = self._make_request("user.status", {"handle": handle})
+
+        # Filter submissions for this contest
+        contest_subs = [s for s in submissions
+                        if s.get("problem", {}).get("contestId") == contest_id]
+
+        if not contest_subs:
+            # Check if contest exists
+            try:
+                self._make_request("contest.standings", {
+                    "contestId": contest_id,
+                    "from": 1,
+                    "count": 1
+                })
+                raise Exception(f"User {handle} did not participate in contest {contest_id}")
+            except:
+                raise Exception(f"Contest {contest_id} not found or user did not participate")
+
+        # Group by problem index
+        problems = {}
+        for sub in contest_subs:
+            problem = sub.get("problem", {})
+            index = problem.get("index")
+            verdict = sub.get("verdict")
+
+            if index not in problems:
+                problems[index] = {
+                    "attempts": 0,
+                    "verdict": None,
+                    "time_min": None,
+                    "tags": problem.get("tags", [])
+                }
+
+            problems[index]["attempts"] += 1
+
+            # Record first AC time
+            if verdict == "OK" and not problems[index]["time_min"]:
+                problems[index]["verdict"] = "OK"
+                # relativeTimeSeconds = seconds from contest start
+                problems[index]["time_min"] = sub.get("relativeTimeSeconds", 0) // 60
+            elif problems[index]["verdict"] != "OK":
+                problems[index]["verdict"] = verdict
+
+        return problems
+
+    def get_contest_problems(self, contest_id):
+        """Get list of all problems in contest"""
+        result = self._make_request("contest.standings", {
+            "contestId": contest_id,
+            "from": 1,
+            "count": 1  # Minimal data, we only need problem list
+        })
+
+        problems = result.get("problems", [])
+        contest = result.get("contest", {})
+
+        return {
+            "contest_name": contest.get("name", f"Contest {contest_id}"),
+            "problems": [
+                {
+                    "index": p.get("index"),
+                    "name": p.get("name"),
+                    "rating": p.get("rating"),
+                    "tags": p.get("tags", [])
+                }
+                for p in problems
+            ]
+        }
+
     def analyze_user_stats(self, handle):
         """Comprehensive analysis of user's problem-solving patterns"""
         # Get user info
@@ -128,16 +199,52 @@ class CodeforcesAPI:
 def main():
     if len(sys.argv) < 2:
         print(json.dumps({
-            "error": "Usage: python codeforces_api.py <codeforces_handle>"
+            "error": "Usage: python codeforces_api.py <handle> OR python codeforces_api.py --contest <handle> <contest_id>"
         }))
         sys.exit(1)
 
-    handle = sys.argv[1]
     api = CodeforcesAPI()
 
     try:
-        stats = api.analyze_user_stats(handle)
-        print(json.dumps(stats, indent=2))
+        # Check for --contest mode
+        if sys.argv[1] == "--contest":
+            if len(sys.argv) < 4:
+                raise Exception("Usage: python codeforces_api.py --contest <handle> <contest_id>")
+
+            handle = sys.argv[2]
+            contest_id = int(sys.argv[3])
+
+            # Fetch contest data
+            submissions = api.get_contest_submissions(handle, contest_id)
+            contest_info = api.get_contest_problems(contest_id)
+
+            # Merge: add problems with 0 attempts
+            all_indices = {p["index"] for p in contest_info["problems"]}
+            attempted_indices = set(submissions.keys())
+            not_attempted = all_indices - attempted_indices
+
+            for index in not_attempted:
+                problem = next(p for p in contest_info["problems"] if p["index"] == index)
+                submissions[index] = {
+                    "attempts": 0,
+                    "verdict": None,
+                    "time_min": None,
+                    "tags": problem["tags"]
+                }
+
+            # Output combined data
+            print(json.dumps({
+                "contest_name": contest_info["contest_name"],
+                "problems": contest_info["problems"],
+                "submissions": submissions
+            }, indent=2))
+
+        else:
+            # Original mode: full user analysis
+            handle = sys.argv[1]
+            stats = api.analyze_user_stats(handle)
+            print(json.dumps(stats, indent=2))
+
     except Exception as e:
         print(json.dumps({
             "error": str(e)

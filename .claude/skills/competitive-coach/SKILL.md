@@ -27,6 +27,7 @@ description: >
 - `/coach reset {topic}` - сбросить прогресс по теме
 - `/coach drill` — набить код из библиотеки (автовыбор темы из weak_topics)
 - `/coach drill {topic}` — набить конкретную тему по имени файла
+- `/coach contest` - проанализировать результаты контеста (ссылку взять из solution/WORKSPACE.md)
 
 ### Предварительная проверка при запуске /coach
 
@@ -856,7 +857,7 @@ if is_breakthrough(user_message):
 Не проблема! Иногда задача оказывается слишком сложной.
 
 Рекомендую: найти разбор этой задачи (editorial на CF или в интернете),
-вставить его в competitive_task.md после "# Разбор" и запустить
+вставить его в solution/WORKSPACE.md после "# Разбор" и запустить
 обсуждение через claude.md (Режим 1 — объяснение готового разбора).
 
 Это лучший способ разобрать задачу — ты увидишь где именно потерялся.
@@ -1190,6 +1191,346 @@ save_stats(stats)
 - Если "да" / "повторить" → вернуться к шагу 3.3 (показать задание заново, без подсказки)
 - Если "нет" / "следующая" → вернуться к шагу 3.1 (автовыбор новой темы)
 - Если пользователь хочет выйти → завершить drill
+
+---
+
+### Режим 4: Анализ контеста
+
+**Вызов:** `/coach contest`
+
+**Цель:** Структурированный анализ стратегии и распределения времени на контесте.
+
+**Подход:** Аналогично работе с задачами - ссылка берётся из `solution/WORKSPACE.md`.
+
+#### 4.1. Валидация и подготовка
+
+1. **Проверка профиля:**
+```bash
+if [ ! -f coach/core.json ]; then
+    echo "❌ Профиль не найден. Создай профиль: /coach init"
+    exit
+fi
+```
+
+2. **Извлечение handle:**
+```bash
+handle=$(jq -r '.user_info.codeforces_handle' coach/core.json)
+if [ "$handle" = "null" ] || [ -z "$handle" ]; then
+    echo "❌ Handle не указан в профиле. Переинициализируй: /coach init"
+    exit
+fi
+```
+
+3. **Чтение ссылки на контест из solution/WORKSPACE.md:**
+```python
+# Читать файл solution/WORKSPACE.md
+with open("solution/WORKSPACE.md") as f:
+    content = f.read()
+
+# Парсить блок "Ссылка на контест"
+contest_section = extract_section(content, "# Ссылка на контест")
+contest_url = contest_section.strip()
+
+if not contest_url or contest_url == "-":
+    print("❌ Вставь ссылку на контест в solution/WORKSPACE.md")
+    print("   Блок: # Ссылка на контест")
+    print("   Формат: https://codeforces.com/contest/1234")
+    exit
+```
+
+4. **Парсинг contest_id из ссылки:**
+```python
+import re
+# Поддерживаемые форматы:
+# - https://codeforces.com/contest/1234
+# - https://codeforces.com/contest/1234/problems
+# - https://codeforces.com/contestRegistration/1234
+match = re.search(r'codeforces\.com/contest(?:Registration)?/(\d+)', contest_url)
+
+if not match:
+    print("❌ Неверный формат ссылки на контест")
+    print("   Ожидается: https://codeforces.com/contest/{id}")
+    exit
+
+contest_id = int(match.group(1))
+```
+
+5. **Фетч данных:**
+```bash
+python3 .claude/skills/competitive-coach/scripts/codeforces_api.py --contest "$handle" "$contest_id"
+```
+
+**Обработка ошибок:**
+- "Contest {id} not found" → "❌ Контест не существует. Проверь ссылку"
+- "did not participate" → "❌ Ты не участвовал в этом контесте"
+- "Network error" → "❌ Не могу подключиться к CF API. Попробуй позже"
+
+#### 4.2. Отображение результатов
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Контест {contest_id}: {contest_name}
+Результаты {handle}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Задача │ Попытки │ Verdict │ Время   │ Теги
+───────┼─────────┼─────────┼─────────┼─────────
+A      │ 1       │ OK      │ 5 мин   │ greedy
+B      │ 2       │ OK      │ 15 мин  │ dp
+C      │ 3       │ OK      │ 30 мин  │ graphs
+D      │ 1       │ WA      │ —       │ dp, trees
+E      │ 0       │ —       │ —       │ flows
+F      │ 0       │ —       │ —       │ geometry
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Итого: 3 решено, 1 попытка без AC, 2 не брали
+```
+
+#### 4.3. Диалог: вопросы про нерешённые задачи
+
+**Для каждой задачи с attempts > 0 и verdict != OK:**
+```
+📝 {index} ({tags}) — почему не решил? Где застрял?
+> [ждать ввод пользователя]
+```
+
+**Для каждой задачи с attempts == 0:**
+```
+📝 {index} ({tags}) — почему не решил?
+> [ждать ввод пользователя]
+```
+
+**Обработка пропусков:**
+- Пользователь нажимает Enter без текста → сохранить ""
+- В анализе: если пусто → "Причина не указана"
+
+**Сохранить в:** `unsolved_reasons[index] = user_input`
+
+#### 4.4. Общий вопрос про стратегию
+
+```
+📝 Как выбирал задачи? В каком порядке решал? Был ли план?
+> [ждать ввод пользователя]
+```
+
+**Сохранить в:** `strategy_notes = user_input`
+
+#### 4.5. Генерация анализа
+
+##### 4.5.1. Определение порядка решения
+
+```python
+# Отсортировать решённые задачи по времени
+solved_sorted = sorted(
+    [(idx, data["time_min"]) for idx, data in submissions.items()
+     if data["verdict"] == "OK"],
+    key=lambda x: x[1]
+)
+solving_order = " → ".join([idx for idx, _ in solved_sorted])
+```
+
+##### 4.5.2. Анализ стратегии
+
+На основе `strategy_notes` и порядка решения:
+```python
+# Определить паттерн
+if solving_order == "A → B → C → ...":
+    strategy_type = "Последовательная по индексу"
+    evaluation = "Стандартный подход для Div. 2"
+else:
+    strategy_type = "Произвольный порядок"
+    evaluation = "Нестандартный порядок — проверь было ли это оптимально"
+```
+
+##### 4.5.3. Распределение времени (правило "потери времени")
+
+```python
+time_wasted_problems = []
+total_solving_time = 0
+total_wasted_time = 0
+
+for index, data in submissions.items():
+    if data["verdict"] == "OK":
+        total_solving_time += data["time_min"]
+    elif data["attempts"] > 0:
+        # Эвристика: последняя попытка = время работы
+        # В реальности нужно взять max timestamp из попыток
+        # Упрощение: считаем минимум 20 мин на нерешённую с попытками
+        estimated_time = 20  # минимальная оценка
+        if estimated_time > 20:
+            time_wasted_problems.append(index)
+            total_wasted_time += estimated_time
+```
+
+**Классификация задач:**
+- `< 15 мин` → ✅ Быстро
+- `15-20 мин` → ✅ Нормально
+- `20-30 мин` → ⚠️ На грани
+- `> 20 мин без AC` → ❌ Потеря времени
+
+##### 4.5.4. Извлечение слабых тем
+
+```python
+# Собрать теги из нерешённых задач
+weak_tags = []
+for index, data in submissions.items():
+    if data["verdict"] != "OK":
+        weak_tags.extend(data["tags"])
+
+weak_topics_detected = list(set(weak_tags))
+
+# Сравнение с профилем
+core = load_core()
+weak_topics_profile = core["knowledge_assessment"]["weak_topics"]
+
+confirmed_weaknesses = [t for t in weak_topics_detected if t in weak_topics_profile]
+new_weaknesses = [t for t in weak_topics_detected if t not in weak_topics_profile]
+```
+
+##### 4.5.5. Генерация файла анализа
+
+**Файл:** `editorials/{contest_id}_analysis.md` (в корне editorials/, не в подпапке!)
+
+**Шаблон:**
+```markdown
+# Анализ контеста {contest_id}: {contest_name}
+
+**Дата анализа:** {current_date}
+**Результат:** {solved}/{total} задач решено
+
+---
+
+## Стратегия выбора задач
+
+**Порядок решения:** {solving_order}
+**Тип стратегии:** {strategy_type}
+
+**Твои заметки:**
+> {strategy_notes}
+
+**Оценка:** {evaluation}
+
+**Рекомендации:** {recommendations}
+
+---
+
+## Распределение времени
+
+| Задача | Попытки | Verdict | Время (мин) | Оценка |
+|--------|---------|---------|-------------|--------|
+{для каждой задачи генерировать строку с emoji оценкой}
+
+**Суммарное время на решённые:** {total_solving_time} мин
+**Время на нерешённые попытки:** {total_wasted_time} мин (оценка)
+
+**Правило "потери времени":** Задачи с >20 мин без AC
+**Потери:** {time_wasted_problems}
+
+---
+
+## Паттерны ошибок
+
+### Нерешённые задачи
+
+{для каждой нерешённой задачи:}
+#### {index} ({tags})
+**Попытки:** {attempts}
+**Verdict:** {verdict or "Не брался"}
+**Причина:** {unsolved_reasons[index] or "Причина не указана"}
+
+**Слабые темы по контесту:** {weak_topics_detected}
+
+**Подтверждённые слабости (из профиля):** {confirmed_weaknesses}
+**Новые слабости:** {new_weaknesses}
+
+---
+
+## Ключевые моменты
+
+{динамическая генерация на основе данных:}
+- ✅ Быстро решил {quick_problems}
+- ⚠️ {borderline_problems} заняли {time} — рискованная граница
+- ❌ {wasted_problems}: потерял время без прогресса
+- 💡 Рекомендация: {recommendations}
+
+---
+
+## Связь с профилем
+
+**Текущий уровень:** {rating}
+**Целевой рейтинг:** {target_rating}
+
+**Твои weak_topics:** {weak_topics_profile}
+**В контесте не решил задачи с тегами:** {weak_topics_detected}
+
+{анализ пересечений и рекомендации}
+
+---
+
+## Действия
+
+- [ ] Повторить теорию: {weak_topics_detected} → /coach
+- [ ] Решить похожие задачи на эти темы
+- [ ] Довести до AC нерешённые: {unsolved_list}
+```
+
+#### 4.6. Обновление stats.json
+
+```python
+# Загрузить stats.json
+stats = load_stats()
+
+# Добавить запись
+contest_record = {
+    "date": current_date_iso,
+    "contest_id": contest_id,
+    "contest_name": contest_name,
+    "problems_attempted": [idx for idx, d in submissions.items() if d["attempts"] > 0],
+    "problems_solved": [idx for idx, d in submissions.items() if d["verdict"] == "OK"],
+    "problems_not_attempted": [idx for idx, d in submissions.items() if d["attempts"] == 0],
+    "time_per_problem_min": {idx: d["time_min"] for idx, d in submissions.items()},
+    "attempts_per_problem": {idx: d["attempts"] for idx, d in submissions.items()},
+    "verdicts": {idx: d["verdict"] for idx, d in submissions.items()},
+    "strategy_notes": strategy_notes,
+    "unsolved_reasons": unsolved_reasons,
+    "weak_topics_detected": weak_topics_detected,
+    "time_wasted_problems": time_wasted_problems,
+    "analysis_file": f"editorials/{contest_id}_analysis.md"
+}
+
+# Добавить в массив (создать если нет)
+if "contest_history" not in stats:
+    stats["contest_history"] = []
+stats["contest_history"].append(contest_record)
+
+# Сохранить
+save_stats(stats)
+```
+
+#### 4.7. Итоговое сообщение
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Анализ контеста {contest_id} завершён!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 Результат: {solved}/{total} решено
+⏱️ Время: {total_solving_time} мин на решённые
+⚠️ Потери: {time_wasted_problems}
+
+📝 Анализ сохранён:
+   editorials/{contest_id}_analysis.md
+
+💡 Рекомендации:
+{if weak_topics_detected:}
+   • Подтянуть теорию: {weak_topics_detected}
+     Используй: /coach для практики
+{if unsolved_problems:}
+   • Довести до AC: {unsolved_problems}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Хочешь попрактиковаться? Введи /coach
+```
 
 ---
 
