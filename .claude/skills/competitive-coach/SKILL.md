@@ -3,9 +3,11 @@ name: coach
 description: >
   Персональный тренер по спортивному программированию.
   Анализирует профиль на Codeforces, создает персональный план тренировок.
-  Поддерживает режимы обучения (викторины, теория) и практики (решение задач с отслеживанием прогресса).
+  Поддерживает режимы обучения (викторины, теория), практики (решение задач)
+  и drill (набивание кода из библиотеки по памяти).
   При первом запуске автоматически инициализирует профиль.
-  Используй: /coach (тренировка), /coach init (переинициализация), /coach stats (статистика).
+  Используй: /coach (тренировка), /coach init (переинициализация),
+  /coach stats (статистика), /coach drill (набивашки).
 ---
 
 # Персональный тренер по спортивному программированию
@@ -23,6 +25,8 @@ description: >
 - `/coach sync` - синхронизировать данные с Codeforces
 - `/coach plan` - показать план тренировок
 - `/coach reset {topic}` - сбросить прогресс по теме
+- `/coach drill` — набить код из библиотеки (автовыбор темы из weak_topics)
+- `/coach drill {topic}` — набить конкретную тему по имени файла
 
 ### Предварительная проверка при запуске /coach
 
@@ -47,6 +51,8 @@ fi
 - Если аргумент `sync` → синхронизировать с CF → обновить stats.json
 - Если аргумент `plan` → показать план из core.json
 - Если аргумент `reset {topic}` → сбросить тему в core.json
+- Если аргумент `drill` → запустить режим drill (автовыбор темы)
+- Если аргумент `drill {topic}` → запустить drill для конкретной темы
 - Если нет аргумента и профиль есть → показать меню режимов
 
 ---
@@ -392,9 +398,10 @@ cat .claude/skills/competitive-coach/templates/stats_profile.json
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 1. 📚 ОБУЧЕНИЕ - изучить новую тему или подтянуть слабую
 2. 💻 ПРАКТИКА - решить задачу
+3. 🔨 DRILL - набить код из библиотеки по памяти
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Выбери номер режима (1 или 2):
+Выбери номер режима (1-3):
 ```
 
 ---
@@ -968,6 +975,224 @@ if detailed_log_requested:
 
 ---
 
+### Режим 3: Drill (набивашки)
+
+Drill — тренировка мышечной памяти. Claude показывает метаданные алгоритма из `library/`, пользователь набивает код по памяти, Claude семантически сравнивает с эталоном и даёт обратную связь.
+
+#### 3.1. Выбор темы
+
+**Если вызван через `/coach drill {topic}`:**
+
+Берём файл `library/{preferred_language}/{topic}.{ext}` (где ext — cpp для C++, py для Python).
+
+Если файл не найден:
+```
+⚠ Файл library/{preferred_language}/{topic}.{ext} не найден.
+
+Доступные темы:
+{список файлов в library/{preferred_language}/}
+
+Введи имя темы:
+```
+
+**Если вызван через `/coach drill` или через меню (пункт 3):**
+
+Автовыбор темы:
+```python
+# 1. Читаем core.json → weak_topics
+weak_topics = core.knowledge_assessment.weak_topics
+
+# 2. Для каждой слабой темы проверяем наличие файлов в library/
+lang = core.user_info.preferred_language  # "cpp" или "py"
+available = []
+for topic in weak_topics:
+    files = glob(f"library/{lang}/{topic}.*")
+    if files:
+        available.append(topic)
+
+# 3. Из найденных выбираем тему (приоритет: давно не тренировалась по drill_history)
+stats = load_stats()
+drill_history = stats.get("drill_history", [])
+
+def last_drill_date(topic):
+    for entry in reversed(drill_history):
+        if entry["topic"] == topic:
+            return entry["date"]
+    return "1970-01-01"  # никогда не тренировалась
+
+if available:
+    # Сортируем по дате последнего drill (самые давние первые)
+    selected = sorted(available, key=last_drill_date)[0]
+else:
+    # Нет файлов по слабым темам — показываем список всех доступных
+    all_files = glob(f"library/{lang}/*.*")
+    print("В библиотеке нет файлов по твоим слабым темам.")
+    print("Доступные темы:")
+    for f in all_files:
+        print(f"  - {basename(f)}")
+    print("Выбери тему:")
+    # Ждём ввод пользователя
+```
+
+#### 3.2. Парсинг файла library
+
+Claude читает файл и извлекает три секции по маркерам:
+
+| Секция | Маркеры | Использование |
+|--------|---------|---------------|
+| Metadata | Строки 1–4 (заголовочные комментарии `//` для cpp, `#` для py) | Имя, ключевые слова, сложность, описание |
+| Эталон | `НАЧАЛО КОПИРУЕМОГО БЛОКА` … `КОНЕЦ КОПИРУЕМОГО БЛОКА` | Сравнение с ответом пользователя |
+| Подсказка | `РЕАЛИЗАЦИЯ С КОММЕНТАРИЯМИ` … `КОНЕЦ КОММЕНТИРОВАННОЙ ВЕРСИИ` | Опциональный hint |
+
+**Парсинг metadata:**
+```python
+# Строки 1-4 файла (после удаления // или #)
+line1 → name       # "Prime Factorization (Разложение на простые множители)"
+line2 → keywords   # "Ключевые слова: factorization, primes, divisors"
+line3 → complexity # "Сложность: O(√n)"
+line4 → description # "Описание: Находит разложение числа n на простые множители"
+```
+
+**Парсинг эталона:**
+```python
+# Текст между маркерами
+reference_code = extract_between("НАЧАЛО КОПИРУЕМОГО БЛОКА", "КОНЕЦ КОПИРУЕМОГО БЛОКА")
+```
+
+**Парсинг подсказки:**
+```python
+# Текст между маркерами
+hint_code = extract_between("РЕАЛИЗАЦИЯ С КОММЕНТАРИЯМИ", "КОНЕЦ КОММЕНТИРОВАННОЙ ВЕРСИИ")
+```
+
+**Извлечение функций из эталона:**
+```python
+# Извлечь сигнатуры функций из reference_code
+# Для C++: паттерн "type name(args)"
+# Для Python: паттерн "def name(args):"
+functions = extract_function_signatures(reference_code)
+```
+
+#### 3.3. Отображение задания
+
+Определить рабочий файл по языку:
+```python
+if lang == "cpp":
+    solution_file = "solution/cpp/task.cpp"
+else:
+    solution_file = "solution/py/main.py"
+```
+
+```
+📚 Drill: {Имя алгоритма}
+Сложность: {сложность}
+Описание: {описание}
+
+Функции для набивания:
+  - {function1}(args) → return_type
+  - {function2}(args) → return_type
+  ...
+
+Use cases:
+  - {примеры использования из metadata/описания}
+
+Код НЕ показывается. Набивай в файл:
+👉 {solution_file}
+─────────────────────────────
+Когда закончишь — напиши "готово", и я проверю.
+```
+
+#### 3.4. Прогрессивность (подсказки)
+
+Перед тем как пользователь начнёт набивать — проверяем `stats.json` → `drill_history`:
+
+```python
+# Проверяем есть ли предыдущие drill по этой теме
+has_previous_drill = any(
+    entry["topic"] == topic for entry in drill_history
+)
+
+if not has_previous_drill:
+    # Первый drill по теме — предлагаем подсказку
+    print("Это твой первый drill по этой теме.")
+    print("Хочешь подсказку? (комментированная версия кода)")
+    # Если "да" → показать hint_code (РЕАЛИЗАЦИЯ С КОММЕНТАРИЯМИ)
+    # Если "нет" → продолжить без подсказки
+else:
+    # Повторный drill — подсказка не предлагается автоматически
+    # Но пользователь может попросить явно ("покажи подсказку")
+    pass
+```
+
+#### 3.5. Семантическое сравнение (после ввода кода пользователем)
+
+Когда пользователь написал код в `solution_file` и сказал "готово":
+
+1. Прочитать файл `solution_file` (solution/cpp/task.cpp или solution/py/main.py)
+2. Сравнить содержимое с `reference_code` (эталон из library)
+
+Claude сравнивает НЕ текстовым diff-ом, а **по смыслу**:
+- **Все ли функции из эталона написаны?** — сопоставить список функций
+- **Верна ли логика каждой функции?** — проверить алгоритм, условия, циклы
+- **Обработаны ли edge cases?** — n=0, n=1, пустые контейнеры и т.д.
+- **Соответствует ли заявленной сложности?** — O(√n), O(n log n) и т.д.
+
+**Формат результата:**
+
+```
+═══════ Результат drill ═══════
+
+✅ Верно:
+  - {что написано правильно}
+
+⚠️ Пропущено:
+  - {что не написано, но есть в эталоне}
+
+❌ Ошибки:
+  - {логические ошибки}
+
+Точность: {N}/{M} функций ({percentage}%)
+───────────────────────────────
+📄 Эталон (КОПИРУЕМЫЙ БЛОК):
+
+{полный код эталона из reference_code}
+───────────────────────────────
+Повторить эту тему? (да/нет) Или следующая тема?
+```
+
+#### 3.6. Сохранение результата
+
+Записываем в `stats.json` → `drill_history`:
+```python
+drill_entry = {
+    "date": current_date_iso,           # "2026-02-05"
+    "topic": topic,                      # "prime_factorization"
+    "language": lang,                    # "cpp"
+    "functions_drilled": functions_list, # ["factorize", "get_prime_divisors", "count_divisors"]
+    "accuracy_score": correct / total,   # 0.66
+    "missed_parts": missed_list,         # ["count_divisors — функция не была написана"]
+    "used_hint": used_hint               # false
+}
+
+stats.drill_history.append(drill_entry)
+save_stats(stats)
+```
+
+**Важно:** Drill **не обновляет confidence** в core.json. Drill — тренировка мышечной памяти, не изучение темы. Confidence обновляется только через learning и practice.
+
+#### 3.7. Цикл
+
+После показа результата — предложить:
+```
+Повторить эту тему? (да/нет) Или следующая тема?
+```
+
+- Если "да" / "повторить" → вернуться к шагу 3.3 (показать задание заново, без подсказки)
+- Если "нет" / "следующая" → вернуться к шагу 3.1 (автовыбор новой темы)
+- Если пользователь хочет выйти → завершить drill
+
+---
+
 ## Дополнительные команды
 
 ### /coach stats
@@ -1010,6 +1235,24 @@ Handle: {codeforces_handle}
     history = stats.topics_history[topic]
     success = history.solved / history.attempts * 100 if history.attempts > 0 else 0
     print(f"{topic:20} {history.attempts:3} попыток | {history.solved:3} решено | {success:.0f}% успеха")
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🔨 Drill (набивашки)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Всего drill-сессий: {len(stats.drill_history)}
+{# Группировка по уникальным темам
+unique_topics = {}
+for entry in stats.drill_history:
+    t = entry["topic"]
+    if t not in unique_topics:
+        unique_topics[t] = {"count": 0, "best_score": 0, "last_date": ""}
+    unique_topics[t]["count"] += 1
+    unique_topics[t]["best_score"] = max(unique_topics[t]["best_score"], entry["accuracy_score"])
+    unique_topics[t]["last_date"] = entry["date"]
+
+for topic, data in unique_topics.items():
+    print(f"  {topic}: {data['count']} раз, лучший: {data['best_score']*100:.0f}%, последний: {data['last_date']}")
 }
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1417,6 +1660,17 @@ fi
       "key_insights": ["Remove prime factors separately"],
       "attempts_count": 2
     }
+  ],
+  "drill_history": [
+    {
+      "date": "2026-02-05",
+      "topic": "prime_factorization",
+      "language": "cpp",
+      "functions_drilled": ["factorize", "get_prime_divisors", "count_divisors"],
+      "accuracy_score": 0.66,
+      "missed_parts": ["count_divisors — функция не была написана"],
+      "used_hint": false
+    }
   ]
 }
 ```
@@ -1648,6 +1902,65 @@ Bot: ✅ Разбор сохранен!
      📝 editorials/1234C_two_sum.md
 ```
 
+### Пример 4: Drill (набивашки)
+```
+User: /coach drill prime_factorization
+
+Bot: 📚 Drill: Prime Factorization (Разложение на простые множители)
+     Сложность: O(√n)
+     Описание: Находит разложение числа n на простые множители и их степени
+
+     Функции для набивания:
+       - factorize(n) → map<prime, power>
+       - get_prime_divisors(n) → vector<prime>
+       - count_divisors(n) → количество делителей
+
+     Use cases:
+       - Факторизация для числовой теории
+       - Подсчёт количества делителей через формулу (a₁+1)×(a₂+1)×...
+       - Нахождение простых делителей числа
+
+     Это твой первый drill по этой теме.
+     Хочешь подсказку? (комментированная версия кода)
+
+User: нет
+
+Bot: Код НЕ показывается. Набивай в файл:
+     👉 solution/cpp/task.cpp
+     ─────────────────────────────
+     Когда закончишь — напиши "готово", и я проверю.
+
+User: готово
+
+Bot: (читает solution/cpp/task.cpp)
+
+Bot: ═══════ Результат drill ═══════
+
+     ✅ Верно:
+       - factorize: логика перебора делителей от 2 до √n — корректна
+       - factorize: обработка остатка n > 1 — есть
+       - get_prime_divisors: корректно убирает все степени делителя внутри цикла
+
+     ⚠️ Пропущено:
+       - count_divisors(n) — функция не была написана
+         Эта функция входит в КОПИРУЕМЫЙ БЛОК
+
+     ❌ Ошибок не найдено
+
+     Точность: 2/3 функций (66%)
+     ───────────────────────────────
+     📄 Эталон (КОПИРУЕМЫЙ БЛОК):
+
+     {полный код эталона}
+     ───────────────────────────────
+     Повторить эту тему? (да/нет) Или следующая тема?
+
+User: нет
+
+Bot: Хочешь выбрать другую тему или завершить?
+     Введи /coach drill для следующей темы или /coach для главного меню.
+```
+
 ---
 
 ## Заметки по реализации
@@ -1671,3 +1984,5 @@ Bot: ✅ Разбор сохранен!
 9. **Миграция из v1**: Скрипт `scripts/migrate_profile.py` конвертирует старый profile.json в core.json + stats.json.
 
 10. **Интеграция существующих команд**: Не дублировать логику `/topic_analysis` и `/solve_problem`, использовать их внутри `/coach`.
+
+11. **Drill не влияет на confidence**: Drill — тренировка мышечной памяти, не изучение темы. Confidence обновляется только через learning и practice.
