@@ -1329,7 +1329,7 @@ save_stats(stats)
 
 **Цель:** Структурированный анализ стратегии и распределения времени на контесте.
 
-**Подход:** Аналогично работе с задачами - ссылка берётся из `solution/WORKSPACE.md`.
+**Подход:** Аналогично работе с задачами - ссылка берётся из `solution/CONTEST.md`.
 
 #### 4.1. Валидация и подготовка
 
@@ -1350,21 +1350,51 @@ if [ "$handle" = "null" ] || [ -z "$handle" ]; then
 fi
 ```
 
-3. **Чтение ссылки на контест из solution/WORKSPACE.md:**
+3. **Чтение CONTEST.md:**
 ```python
-# Читать файл solution/WORKSPACE.md
-with open("solution/WORKSPACE.md") as f:
+# Check if CONTEST.md exists
+if not os.path.exists("solution/CONTEST.md"):
+    print("❌ Файл solution/CONTEST.md не найден.")
+    print("   Создайте его по шаблону из документации.")
+    exit
+
+with open("solution/CONTEST.md") as f:
     content = f.read()
 
-# Парсить блок "Ссылка на контест"
-contest_section = extract_section(content, "# Ссылка на контест")
-contest_url = contest_section.strip()
+# Parse sections
+contest_url = extract_section(content, "# Ссылка на контест").strip()
+contest_type = extract_section(content, "# Тип контеста").strip().lower()  # "solo" or "team"
+user_handle_section = extract_section(content, "## Ваш handle").strip()
+team_handles_section = extract_section(content, "## Участники команды").strip()
 
+# Validate contest URL
 if not contest_url or contest_url == "-":
-    print("❌ Вставь ссылку на контест в solution/WORKSPACE.md")
+    print("❌ Вставь ссылку на контест в solution/CONTEST.md")
     print("   Блок: # Ссылка на контест")
-    print("   Формат: https://codeforces.com/contest/1234")
     exit
+
+# Validate type
+if contest_type not in ["solo", "team"]:
+    print("❌ Тип контеста должен быть 'solo' или 'team'")
+    exit
+
+# Parse team handles
+if contest_type == "team":
+    # Get handles from "Участники команды" section
+    team_handles = [user_handle_section]  # Include main user
+
+    # Parse other handles (each on new line, skip lines with "-" or "<!--")
+    for line in team_handles_section.split('\n'):
+        line = line.strip()
+        if line and line != "-" and not line.startswith("<!--"):
+            team_handles.append(line)
+
+    if len(team_handles) < 2:
+        print("❌ Для team контеста укажи хотя бы одного участника команды")
+        print("   Блок: ## Участники команды")
+        exit
+else:
+    team_handles = [user_handle_section]
 ```
 
 4. **Парсинг contest_id из ссылки:**
@@ -1386,7 +1416,12 @@ contest_id = int(match.group(1))
 
 5. **Фетч данных:**
 ```bash
-python3 .claude/skills/competitive-coach/scripts/codeforces_api.py --contest "$handle" "$contest_id"
+if contest_type == "solo":
+    # Original behavior
+    python3 .claude/skills/competitive-coach/scripts/codeforces_api.py --contest "$user_handle_section" "$contest_id"
+else:
+    # Team mode
+    python3 .claude/skills/competitive-coach/scripts/codeforces_api.py --team "$contest_id" "${team_handles[@]}"
 ```
 
 **Обработка ошибок:**
@@ -1395,6 +1430,8 @@ python3 .claude/skills/competitive-coach/scripts/codeforces_api.py --contest "$h
 - "Network error" → "❌ Не могу подключиться к CF API. Попробуй позже"
 
 #### 4.2. Отображение результатов
+
+**Для solo режима:**
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1414,7 +1451,34 @@ F      │ 0       │ —       │ —       │ geometry
 Итого: 3 решено, 1 попытка без AC, 2 не брали
 ```
 
+**Для team режима:**
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Контест {contest_id}: {contest_name}
+Результаты команды: {", ".join(team_handles)}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Задача │ Решил    │ Время   │ Попыток (команда) │ Теги
+───────┼──────────┼─────────┼───────────────────┼─────────
+A      │ tourist  │ 5 мин   │ 2 (T:1, P:1)      │ greedy
+B      │ Petr     │ 15 мин  │ 3 (P:3)           │ dp
+C      │ tourist  │ 30 мин  │ 5 (T:3, V:2)      │ graphs
+D      │ —        │ —       │ 8 (T:3, P:5)      │ dp, trees
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Итого: 3/6 решено командой
+Суммарное время: 50 мин
+```
+
+**Примечание для team режима:**
+- В колонке "Попыток (команда)" указать сумму попыток всех участников
+- В скобках указать разбивку по участникам (первая буква handle)
+- Колонка "Решил" содержит handle того, кто первым получил AC (или с лучшим временем)
+
 #### 4.3. Диалог: вопросы про нерешённые задачи
+
+**Solo режим:**
 
 **Для каждой задачи с attempts > 0 и verdict != OK:**
 ```
@@ -1434,7 +1498,25 @@ F      │ 0       │ —       │ —       │ geometry
 
 **Сохранить в:** `unsolved_reasons[index] = user_input`
 
+**Team режим:**
+
+**Для каждой задачи с attempts > 0 (любого участника) и verdict != OK:**
+```
+📝 {index} ({tags}) — кто пытался решить? Где застряли?
+> [ждать ввод пользователя]
+```
+
+**Для каждой задачи с attempts == 0:**
+```
+📝 {index} ({tags}) — почему не решили?
+> [ждать ввод пользователя]
+```
+
+**Сохранить в:** `unsolved_reasons[index] = user_input`
+
 #### 4.4. Общий вопрос про стратегию
+
+**Solo режим:**
 
 ```
 📝 Как выбирал задачи? В каком порядке решал? Был ли план?
@@ -1443,7 +1525,20 @@ F      │ 0       │ —       │ —       │ geometry
 
 **Сохранить в:** `strategy_notes = user_input`
 
-#### 4.5. Генерация анализа
+**Team режим (дополнительные вопросы):**
+
+```
+📝 Как распределяли задачи? Был ли план?
+> [ждать ввод: strategy_notes]
+
+📝 Были ли проблемы с коммуникацией? Как координировались?
+> [ждать ввод: communication_notes]
+
+📝 Кто какую роль выполнял? (решатель/кодер/дебаггер/...)
+> [ждать ввод: roles_notes]
+```
+
+#### 4.5. Генерация анализа (Solo режим)
 
 ##### 4.5.1. Определение порядка решения
 
@@ -1602,7 +1697,160 @@ new_weaknesses = [t for t in weak_topics_detected if t not in weak_topics_profil
 - [ ] Довести до AC нерешённые: {unsolved_list}
 ```
 
+#### 4.5.6. Генерация анализа (Team режим)
+
+**Применяется только если contest_type == "team"**
+
+##### 1. Вычисление метрик команды
+
+```python
+# Вклад участников
+contributions = {}
+for handle, stats in aggregated["team_stats"].items():
+    contributions[handle] = {
+        "solved": stats["solved"],  # ["A", "C"]
+        "solved_count": len(stats["solved"]),
+        "attempts": stats["attempts"],
+        "contribution_pct": len(stats["solved"]) / len(aggregated["problems_solved"]) * 100 if aggregated["problems_solved"] else 0
+    }
+
+# Эффективность распределения задач
+# Метрика: были ли случаи когда несколько участников пытались одну задачу?
+duplicated_efforts = []
+for index in contest_info["problems"]:
+    index_key = index["index"]
+    who_attempted = [h for h, subs in team_data.items()
+                     if index_key in subs and subs[index_key]["attempts"] > 0]
+    if len(who_attempted) > 1:
+        duplicated_efforts.append({
+            "problem": index_key,
+            "who": who_attempted,
+            "total_attempts": sum(team_data[h][index_key]["attempts"] for h in who_attempted)
+        })
+
+# Синергия: решённые задачи / сумма индивидуальных попыток
+# Низкая синергия = много дублирования
+total_team_attempts = sum(stats["attempts"] for stats in aggregated["team_stats"].values())
+synergy_score = len(aggregated["problems_solved"]) / total_team_attempts * 100 if total_team_attempts else 0
+
+# Эффективность: (решённые задачи / всего задач) * (100 - дублирование_штраф)
+efficiency_score = (len(aggregated["problems_solved"]) / len(contest_info["problems"])) * (100 - len(duplicated_efforts) * 10)
+
+# Слабые темы команды
+weak_topics_team = []
+for index in aggregated["problems_not_solved"]:
+    problem = next(p for p in contest_info["problems"] if p["index"] == index)
+    weak_topics_team.extend(problem["tags"])
+
+weak_topics_team = list(set(weak_topics_team))
+```
+
+##### 2. Генерация файла `editorials/{contest_id}_team_analysis.md`
+
+**Шаблон:**
+
+```markdown
+# Анализ командного контеста {contest_id}: {contest_name}
+
+**Дата:** {date}
+**Команда:** {", ".join(team_handles)}
+**Результат:** {len(problems_solved)}/{len(all_problems)} решено
+
+## Результаты команды
+
+### Общая таблица
+
+| Задача | Решил | Время | Попытки (команда) | Статус |
+|--------|-------|-------|-------------------|--------|
+{for каждой задачи:}
+| {index} | {solutions_per_problem.get(index, "—")} | {time_per_problem.get(index, "—")} мин | {total_attempts} | {✅ if solved else ❌ Не решили} |
+{endfor}
+
+**Суммарное время на решённые:** {total_solve_time} мин
+
+### Вклад участников
+
+| Участник | Решено | Попыток | Вклад |
+|----------|--------|---------|-------|
+{for handle, contrib in contributions.items():}
+| {handle} | {contrib["solved_count"]} | {contrib["attempts"]} | {contrib["contribution_pct"]:.1f}% |
+{endfor}
+
+**Детали:**
+{for handle, contrib in contributions.items():}
+- **{handle}:** Решил {", ".join(contrib["solved"])} ({комментарий})
+{endfor}
+
+## Эффективность команды
+
+**Общая эффективность:** {efficiency_score:.0f}/100
+**Синергия:** {synergy_score:.0f}/100
+
+### Распределение задач
+
+**Стратегия:** {strategy_notes}
+
+**Оценка:**
+{динамическая оценка на основе дублирования}
+
+**Дублирование усилий:**
+{if duplicated_efforts:}
+{for dup in duplicated_efforts:}
+- **{dup["problem"]}**: пытались {", ".join(dup["who"])} ({dup["total_attempts"]} попыток)
+{endfor}
+{else:}
+- Дублирования не было ✅
+{endif}
+
+### Коммуникация
+
+**Заметки:** {communication_notes}
+
+**Оценка:**
+{if len(duplicated_efforts) > 0:}
+⚠️ Были случаи дублирования — улучшить координацию
+{else:}
+✅ Хорошая координация, дублирования не было
+{endif}
+
+### Роли
+
+**Заметки:** {roles_notes}
+
+## Слабые темы команды
+
+**Темы из нерешённых задач:** {", ".join(weak_topics_team)}
+
+### Связь с индивидуальными профилями
+
+{for handle in team_handles:}
+**{handle}:**
+- Личные weak_topics: {core.get(handle, {}).get("weak_topics", [])}
+- Пересечение: {intersection(weak_topics_team, personal_weak_topics)}
+{endfor}
+
+## Рекомендации
+
+### По координации
+{динамические рекомендации на основе duplicated_efforts}
+
+### По подготовке
+- Подтянуть темы команды: {weak_topics_team}
+{for handle in team_handles:}
+- {handle}: фокус на {его слабые темы}
+{endfor}
+
+### Действия
+- [ ] Провести разбор нерешённых задач {", ".join(problems_not_solved)}
+- [ ] Обсудить стратегию распределения для следующего контеста
+{if duplicated_efforts:}
+- [ ] Установить систему координации (кто что решает)
+{endif}
+```
+
 #### 4.6. Обновление stats.json
+
+**Solo режим:**
 
 ```python
 # Загрузить stats.json
@@ -1635,7 +1883,51 @@ stats["contest_history"].append(contest_record)
 save_stats(stats)
 ```
 
+**Team режим:**
+
+```python
+# Загрузить stats.json
+stats = load_stats()
+
+# Team contest record
+team_record = {
+    "date": current_date_iso,
+    "contest_id": contest_id,
+    "contest_name": contest_name,
+    "team_members": team_handles,
+
+    "team_results": {
+        "problems_solved": aggregated["problems_solved"],
+        "problems_not_solved": aggregated["problems_not_solved"],
+        "total_problems": len(contest_info["problems"]),
+        "total_solve_time": aggregated["total_solve_time"],
+        "team_efficiency_score": efficiency_score,
+        "team_synergy_score": synergy_score
+    },
+
+    "individual_contributions": contributions,
+    "duplicated_efforts": duplicated_efforts,
+
+    "strategy_notes": strategy_notes,
+    "communication_notes": communication_notes,
+    "roles_notes": roles_notes,
+
+    "weak_topics_team": weak_topics_team,
+    "analysis_file": f"editorials/{contest_id}_team_analysis.md"
+}
+
+# Add to team_contest_history
+if "team_contest_history" not in stats:
+    stats["team_contest_history"] = []
+stats["team_contest_history"].append(team_record)
+
+# Сохранить
+save_stats(stats)
+```
+
 #### 4.7. Итоговое сообщение
+
+**Solo режим:**
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1659,6 +1951,36 @@ save_stats(stats)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Хочешь попрактиковаться? Введи /coach
+```
+
+**Team режим:**
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Анализ командного контеста {contest_id} завершён!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🤝 Команда: {", ".join(team_handles)}
+📊 Результат: {solved}/{total} решено
+⏱️ Время: {total_time} мин
+⚡ Эффективность: {efficiency_score:.0f}/100
+
+👥 Вклад:
+{for handle, contrib in contributions.items():}
+   {handle}: {contrib["solved_count"]} задач ({contrib["contribution_pct"]:.1f}%)
+{endfor}
+
+📝 Анализ сохранён:
+   editorials/{contest_id}_team_analysis.md
+
+💡 Рекомендации:
+   • Слабые темы команды: {weak_topics_team}
+{if duplicated_efforts:}
+   • Улучшить координацию (было дублирование)
+{endif}
+   • Каждому участнику: подтянуть свои weak_topics
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
 ---

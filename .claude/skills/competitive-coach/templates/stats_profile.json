@@ -22,5 +22,6 @@
   },
   "session_history": [],
   "drill_history": [],
-  "contest_history": []
+  "contest_history": [],
+  "team_contest_history": []
 }

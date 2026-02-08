@@ -196,18 +196,114 @@ class CodeforcesAPI:
             "analysis_timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         }
 
+
+def aggregate_team_solutions(team_data, contest_info):
+    """
+    Aggregate team results: which problems solved by whom, timings, etc.
+
+    Args:
+        team_data: {handle: {problem_index: {attempts, verdict, time_min, tags}}}
+        contest_info: {contest_name, problems}
+
+    Returns:
+        {
+            "problems_solved": ["A", "B", "C"],
+            "problems_not_solved": ["D", "E"],
+            "solutions_per_problem": {"A": "handle1", "B": "handle2", ...},
+            "time_per_problem": {"A": 5, "B": 15, ...},
+            "total_solve_time": 20,
+            "team_stats": {
+                "handle1": {"solved": ["A", "C"], "attempts": 5},
+                "handle2": {"solved": ["B"], "attempts": 3}
+            }
+        }
+    """
+    all_indices = {p["index"] for p in contest_info["problems"]}
+    problems_solved = []
+    problems_not_solved = []
+    solutions_per_problem = {}
+    time_per_problem = {}
+    team_stats = {handle: {"solved": [], "attempts": 0} for handle in team_data.keys()}
+
+    for index in sorted(all_indices):
+        solved_by = None
+        best_time = None
+
+        # Check each participant
+        for handle, submissions in team_data.items():
+            if index in submissions:
+                team_stats[handle]["attempts"] += submissions[index]["attempts"]
+
+                if submissions[index]["verdict"] == "OK":
+                    # First AC or better time
+                    if not solved_by or (submissions[index]["time_min"] is not None and
+                        (best_time is None or submissions[index]["time_min"] < best_time)):
+                        solved_by = handle
+                        best_time = submissions[index]["time_min"]
+
+        if solved_by:
+            problems_solved.append(index)
+            solutions_per_problem[index] = solved_by
+            time_per_problem[index] = best_time
+            team_stats[solved_by]["solved"].append(index)
+        else:
+            problems_not_solved.append(index)
+
+    total_solve_time = sum(time_per_problem.values())
+
+    return {
+        "problems_solved": problems_solved,
+        "problems_not_solved": problems_not_solved,
+        "solutions_per_problem": solutions_per_problem,
+        "time_per_problem": time_per_problem,
+        "total_solve_time": total_solve_time,
+        "team_stats": team_stats
+    }
+
+
 def main():
     if len(sys.argv) < 2:
         print(json.dumps({
-            "error": "Usage: python codeforces_api.py <handle> OR python codeforces_api.py --contest <handle> <contest_id>"
+            "error": "Usage: python codeforces_api.py <handle> OR python codeforces_api.py --contest <handle> <contest_id> OR python codeforces_api.py --team <contest_id> <handle1> <handle2> ..."
         }))
         sys.exit(1)
 
     api = CodeforcesAPI()
 
     try:
+        # Check for --team mode
+        if sys.argv[1] == "--team":
+            if len(sys.argv) < 4:
+                raise Exception("Usage: python codeforces_api.py --team <contest_id> <handle1> <handle2> ...")
+
+            contest_id = int(sys.argv[2])
+            handles = sys.argv[3:]  # All team handles
+
+            # Fetch data for each participant
+            team_data = {}
+            contest_info = None
+
+            for handle in handles:
+                submissions = api.get_contest_submissions(handle, contest_id)
+                team_data[handle] = submissions
+
+                # Get contest info once
+                if not contest_info:
+                    contest_info = api.get_contest_problems(contest_id)
+
+            # Aggregate team results
+            aggregated = aggregate_team_solutions(team_data, contest_info)
+
+            # Output
+            print(json.dumps({
+                "contest_name": contest_info["contest_name"],
+                "problems": contest_info["problems"],
+                "team_data": team_data,
+                "aggregated": aggregated
+            }, indent=2))
+
         # Check for --contest mode
-        if sys.argv[1] == "--contest":
+        elif sys.argv[1] == "--contest":
             if len(sys.argv) < 4:
                 raise Exception("Usage: python codeforces_api.py --contest <handle> <contest_id>")
 
